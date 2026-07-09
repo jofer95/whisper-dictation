@@ -1,0 +1,13 @@
+# Top-level dependencies (human-edited). The pinned, fully-resolved tree lives
+# in requirements.txt — regenerate it with:  pip install -r requirements.in && pip freeze > requirements.txt
+#
+# Deliberately absent vs. the upstream fork:
+#   - openai        (cloud SDK — never imported; pulled aiohttp + 57 advisories)
+#   - openai-whisper / torch (replaced by CTranslate2 — no torch, no torch CVEs)
+#   - keyboard      (unused; needs root on macOS)
+
+faster-whisper   # torch-free Whisper (CTranslate2); runs on Apple Silicon + Intel
+sounddevice      # mic capture; bundles PortAudio (no Homebrew needed)
+pynput           # global hotkey + text injection
+rumps            # menu-bar app (brings pyobjc / AppKit for clipboard)
+numpy            # audio buffer math
