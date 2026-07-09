@@ -71,6 +71,11 @@ def parse_args(argv=None):
         help="Do NOT play the start/stop audio cues (on by default).",
     )
     parser.add_argument(
+        "--no-waveform", action="store_true",
+        help="Do NOT show the floating waveform overlay while recording "
+        "(on by default).",
+    )
+    parser.add_argument(
         "--self-test", action="store_true",
         help="Load the model, run one inference through the engine, then exit "
         "0. Used to verify a packaged build boots without a mic/hotkey.",
@@ -107,8 +112,9 @@ def main(argv=None):
     language = args.language if args.language is not None else saved.get("language")
     mute = False if args.no_mute else bool(saved.get("mute", True))
     sounds = False if args.no_sounds else bool(saved.get("sounds", True))
+    waveform = False if args.no_waveform else bool(saved.get("waveform", True))
     log.info(f"prefs applied: hotkey={hotkey} device={device_spec!r} "
-             f"language={language!r} mute={mute} sounds={sounds}")
+             f"language={language!r} mute={mute} sounds={sounds} waveform={waveform}")
 
     device = resolve_device(device_spec)
     log.info(f"input device: '{device_name(device)}' (index={device})")
@@ -119,7 +125,7 @@ def main(argv=None):
         recorder, transcriber, injector,
         languages=args.languages, language=language,
         max_time=args.max_time, hotkey=hotkey,
-        mute_while_recording=mute, play_sounds=sounds,
+        mute_while_recording=mute, play_sounds=sounds, show_waveform=waveform,
     )
 
     if args.self_test:
