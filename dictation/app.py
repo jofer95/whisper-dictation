@@ -9,6 +9,7 @@ a background thread" footgun that the original app skated close to.
 
 import threading
 import time
+from collections import deque
 
 import numpy as np
 import rumps
@@ -17,6 +18,7 @@ from . import perms
 from . import prefs
 from .hotkey import HotkeyMonitor
 from .log import get_logger
+from .overlay import WaveformOverlay
 from .recorder import list_input_devices, device_name
 from .sound import get_output_muted, set_output_muted, play_sound
 
@@ -29,6 +31,10 @@ SILENCE_PEAK = 0.005
 START_SOUND = "Tink"
 STOP_SOUND = "Bottle"
 
+# History of recent dictations kept in the menu (rescue when focus was lost).
+HISTORY_SIZE = 3
+HISTORY_PREVIEW = 45  # chars shown in the menu label before truncating
+
 # Selectable shortcuts: (menu label, spec). "double_cmd" is the special
 # double-tap Right Command mode; everything else is a combo of tokens joined by
 # "+". A bare modifier name (cmd/ctrl/alt/shift) matches either side; a sided
@@ -40,6 +46,7 @@ SHORTCUTS = [
     ("⌘ + Shift", "cmd+shift"),
     ("⌥ + Space", "alt+space"),
     ("Double-tap Right ⌘", "double_cmd"),
+    ("⌘ + D (hold to talk)", "hold:cmd+d"),
 ]
 
 
@@ -50,7 +57,7 @@ class StatusBarApp(rumps.App):
 
     def __init__(self, recorder, transcriber, injector,
                  languages=None, language=None, max_time=60, hotkey="cmd+alt",
-                 mute_while_recording=True, play_sounds=True):
+                 mute_while_recording=True, play_sounds=True, show_waveform=True):
         super().__init__("Whisper Dictation", title=self.IDLE_ICON, quit_button="Quit")
         self.recorder = recorder
         self.transcriber = transcriber
@@ -60,6 +67,8 @@ class StatusBarApp(rumps.App):
         self.max_time = max_time
         self.mute_while_recording = mute_while_recording
         self.play_sounds = play_sounds
+        self.show_waveform = show_waveform
+        self._overlay = WaveformOverlay(recorder.level)
 
         self.recording = False
         self.busy = False
@@ -117,6 +126,18 @@ class StatusBarApp(rumps.App):
             "Play start/stop sounds", callback=self._on_sounds_toggle_clicked)
         self._sounds_item.state = 1 if self.play_sounds else 0
 
+        self._waveform_item = rumps.MenuItem(
+            "Show waveform while recording", callback=self._on_waveform_toggle_clicked)
+        self._waveform_item.state = 1 if self.show_waveform else 0
+
+        # Last 3 dictations, newest first. Fixed slots we retitle on the main
+        # thread; clicking one copies the full text (rescue for lost focus).
+        self._history = deque(maxlen=HISTORY_SIZE)  # newest first, auto-capped
+        self._history_dirty = False
+        self._history_items = [
+            rumps.MenuItem("(empty)", callback=None) for _ in range(HISTORY_SIZE)
+        ]
+
         self.menu = [
             rumps.MenuItem("Start Dictation", callback=self._on_start_clicked),
             rumps.MenuItem("Stop Dictation", callback=self._on_stop_clicked),
@@ -126,6 +147,9 @@ class StatusBarApp(rumps.App):
             ("Language", lang_items),
             self._mute_item,
             self._sounds_item,
+            self._waveform_item,
+            None,
+            ("History (click to copy)", self._history_items),
             None,
             self._status_item,
             self._perms_item,
@@ -159,6 +183,7 @@ class StatusBarApp(rumps.App):
             "language": self.current_language,
             "mute": self.mute_while_recording,
             "sounds": self.play_sounds,
+            "waveform": self.show_waveform,
         })
 
     def _on_device_clicked(self, sender):
@@ -187,6 +212,34 @@ class StatusBarApp(rumps.App):
         log.info(f"language set to {self.current_language!r}")
         self._save_prefs()
 
+    # ---- dictation history (append off-thread, render on the main thread) ----
+    def _add_history(self, text):
+        """Called from the transcription worker: record the text and mark the
+        menu dirty. The actual menu mutation happens in _tick (main thread)."""
+        self._history.appendleft(text)  # deque(maxlen) drops the oldest for us
+        self._history_dirty = True
+
+    def _refresh_history(self):
+        for i, slot in enumerate(self._history_items):
+            if i < len(self._history):
+                text = self._history[i]
+                preview = " ".join(text.split())  # collapse newlines for the label
+                if len(preview) > HISTORY_PREVIEW:
+                    preview = preview[:HISTORY_PREVIEW - 1] + "…"
+                slot.title = preview
+                slot.set_callback(self._on_history_clicked)
+            else:
+                slot.title = "(empty)"
+                slot.set_callback(None)
+
+    def _on_history_clicked(self, sender):
+        idx = next((i for i, it in enumerate(self._history_items) if it is sender), None)
+        if idx is None or idx >= len(self._history):
+            return
+        self.injector.copy(self._history[idx])
+        self._status = "copied from history"
+        log.info(f"copied history[{idx}] to clipboard")
+
     def _on_mute_toggle_clicked(self, sender):
         self.mute_while_recording = not self.mute_while_recording
         sender.state = 1 if self.mute_while_recording else 0
@@ -199,6 +252,16 @@ class StatusBarApp(rumps.App):
         log.info(f"play-sounds = {self.play_sounds}")
         if self.play_sounds:
             play_sound(START_SOUND)  # preview when enabling
+        self._save_prefs()
+
+    def _on_waveform_toggle_clicked(self, sender):
+        self.show_waveform = not self.show_waveform
+        sender.state = 1 if self.show_waveform else 0
+        log.info(f"show-waveform = {self.show_waveform}")
+        if not self.show_waveform:
+            self._overlay.hide()  # drop it immediately if we're mid-recording
+        elif self.recording:
+            self._overlay.show()
         self._save_prefs()
 
     def _on_grant_clicked(self, _):
@@ -247,6 +310,8 @@ class StatusBarApp(rumps.App):
             return
         self.recording = True
         self._start_time = time.time()
+        if self.show_waveform:
+            self._overlay.show()
         if self.mute_while_recording:
             self._prev_muted = get_output_muted()
             set_output_muted(True)
@@ -255,6 +320,10 @@ class StatusBarApp(rumps.App):
         if not self.recording:
             return
         self.recording = False
+        # Keep the pill up but flip it to a spinner while we transcribe; the
+        # worker hides it via overlay.finish() when it's done.
+        if self.show_waveform:
+            self._overlay.begin_loading()
         if self.mute_while_recording:
             # restore exactly what the user had before we muted
             set_output_muted(bool(self._prev_muted))
@@ -280,6 +349,9 @@ class StatusBarApp(rumps.App):
                 self._status = "no speech detected"
                 log.info("transcription empty")
                 return
+            # Record before inject: if focus was lost and the paste misses, the
+            # text is still recoverable from the History menu.
+            self._add_history(text)
             self.injector.insert(text)
             if perms.accessibility_trusted(prompt=False):
                 self._status = f'inserted: "{text[:40]}"'
@@ -290,6 +362,7 @@ class StatusBarApp(rumps.App):
             log.exception("transcribe/inject failed")
         finally:
             self.busy = False
+            self._overlay.finish()  # hide the loading pill (hops to main thread)
 
     # ---- title + status rendering, max_time (main thread) ----
     def _tick(self, _):
@@ -304,6 +377,10 @@ class StatusBarApp(rumps.App):
         else:
             self.title = self.IDLE_ICON
         self._status_item.title = f"Status: {self._status}"
+
+        if self._history_dirty:
+            self._refresh_history()
+            self._history_dirty = False
 
         # Refresh permissions every ~3s. If Accessibility was just granted,
         # re-register the hotkey monitor so it starts working without a relaunch.
