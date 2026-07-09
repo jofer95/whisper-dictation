@@ -95,6 +95,7 @@ first launch. After that, pull the Wi-Fi plug and it keeps working forever.
 - 🎚️ **Pick any microphone** from the menu (USB, Continuity Camera, built-in…).
 - ⌨️ **Configurable shortcut** — `⌘+Option`, `⌃+Option`, `⌃+Left Shift`, double-tap Right ⌘, and more.
 - 🎙️ **Toggle *or* push-to-talk** — tap on / tap off, or **hold** the shortcut to dictate and release to stop (Mode menu).
+- 🪟 **Glass recording pill** — floating overlay proves the mic is live; pick the look: **Cream**, **Liquid Glass**, **Dark HUD**, or **Aurora** (real macOS blur).
 - 🔇 **Auto-mutes your music** while recording, then restores it (so songs don't leak into the mic).
 - 🔔 **Audio cues** on start/stop so you know it's listening — without looking.
 - 💾 **Remembers your settings** (mic, shortcut, language, mute, sounds) between launches.
@@ -141,6 +142,7 @@ Look for 🎙️ in the menu bar. Everything is adjustable live from its menu:
 | **Microphone** | Choose your input device. |
 | **Shortcut** | Change the activation keys. |
 | **Mode** | **Toggle** (tap on/off) or **Hold** (push-to-talk). |
+| **Overlay style** | Recording-pill look: Cream, Liquid Glass, Dark HUD, or Aurora. |
 | **Language** | Auto (best for mixing), Español, or English. |
 | **Mute audio while recording** | Silence output during capture. |
 | **Play start/stop sounds** | The *Tink* / *Bottle* cues. |

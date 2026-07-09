@@ -39,8 +39,8 @@ PLIST = {
     "CFBundleName": "Whisper Dictation",
     "CFBundleDisplayName": "Whisper Dictation",
     "CFBundleIdentifier": "io.github.jofer95.whisper-dictation",
-    "CFBundleVersion": "1.10.0",
-    "CFBundleShortVersionString": "1.10.0",
+    "CFBundleVersion": "1.11.0",
+    "CFBundleShortVersionString": "1.11.0",
     "LSMinimumSystemVersion": "11.0",
     "LSUIElement": True,  # menu-bar app: no Dock icon, no main window
     "LSMultipleInstancesProhibited": True,  # never run two copies at once

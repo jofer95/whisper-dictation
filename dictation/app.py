@@ -45,6 +45,7 @@ SHORTCUTS = [
     ("⌃ + Left Shift", "ctrl+shift_l"),
     ("⌘ + Shift", "cmd+shift"),
     ("⌥ + Space", "alt+space"),
+    ("⌘ + D", "cmd+d"),
     ("Double-tap Right ⌘", "double_cmd"),
 ]
 
@@ -52,6 +53,14 @@ SHORTCUTS = [
 MODES = [
     ("Toggle (tap on / tap off)", "toggle"),
     ("Hold (push-to-talk)", "hold"),
+]
+
+# Recording-pill looks (see dictation/overlay.py).
+OVERLAY_STYLES = [
+    ("Cream (original)", "cream"),
+    ("Liquid Glass", "glass"),
+    ("Dark HUD Glass", "hud"),
+    ("Aurora Glass", "aurora"),
 ]
 
 
@@ -63,7 +72,7 @@ class StatusBarApp(rumps.App):
     def __init__(self, recorder, transcriber, injector,
                  languages=None, language=None, max_time=60, hotkey="cmd+alt",
                  hotkey_mode="toggle", mute_while_recording=True,
-                 play_sounds=True, show_waveform=True):
+                 play_sounds=True, show_waveform=True, overlay_style="glass"):
         super().__init__("Whisper Dictation", title=self.IDLE_ICON, quit_button="Quit")
         self.recorder = recorder
         self.transcriber = transcriber
@@ -74,7 +83,8 @@ class StatusBarApp(rumps.App):
         self.mute_while_recording = mute_while_recording
         self.play_sounds = play_sounds
         self.show_waveform = show_waveform
-        self._overlay = WaveformOverlay(recorder.level)
+        self.overlay_style = overlay_style
+        self._overlay = WaveformOverlay(recorder.level, style=overlay_style)
 
         self.recording = False
         self.busy = False
@@ -119,6 +129,15 @@ class StatusBarApp(rumps.App):
             item = rumps.MenuItem(label, callback=self._on_mode_clicked)
             item.state = 1 if mode == self.hotkey_mode else 0
             mode_items.append(item)
+
+        # --- overlay-style submenu (the recording pill's look) ---
+        self._overlay_by_label = {}
+        overlay_items = []
+        for label, style in OVERLAY_STYLES:
+            self._overlay_by_label[label] = style
+            item = rumps.MenuItem(label, callback=self._on_overlay_clicked)
+            item.state = 1 if style == self.overlay_style else 0
+            overlay_items.append(item)
 
         # --- language submenu (Auto is best for mixed ES/EN; never translates) ---
         self._lang_by_label = {"Auto (mixed languages)": None, "Español": "es", "English": "en"}
@@ -167,6 +186,7 @@ class StatusBarApp(rumps.App):
             self._mute_item,
             self._sounds_item,
             self._waveform_item,
+            ("Overlay style", overlay_items),
             None,
             ("History (click to copy)", self._history_items),
             None,
@@ -207,6 +227,7 @@ class StatusBarApp(rumps.App):
             "mute": self.mute_while_recording,
             "sounds": self.play_sounds,
             "waveform": self.show_waveform,
+            "overlay_style": self.overlay_style,
         })
 
     def _on_device_clicked(self, sender):
@@ -296,6 +317,18 @@ class StatusBarApp(rumps.App):
             self._overlay.hide()  # drop it immediately if we're mid-recording
         elif self.recording:
             self._overlay.show()
+        self._save_prefs()
+
+    def _on_overlay_clicked(self, sender):
+        style = self._overlay_by_label.get(sender.title)
+        if style is None:
+            return
+        self.overlay_style = style
+        self._overlay.set_style(style)  # rebuilds; re-shows if mid-recording
+        for label in self._overlay_by_label:
+            self.menu["Overlay style"][label].state = 1 if label == sender.title else 0
+        self._status = f"overlay: {sender.title}"
+        log.info(f"overlay style = {style}")
         self._save_prefs()
 
     def _on_grant_clicked(self, _):

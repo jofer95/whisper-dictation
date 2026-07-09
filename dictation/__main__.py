@@ -81,6 +81,12 @@ def parse_args(argv=None):
         "(on by default).",
     )
     parser.add_argument(
+        "--overlay-style", default=None,
+        choices=["cream", "glass", "hud", "aurora"],
+        help="Recording-pill look: cream, glass (Liquid Glass), hud, or aurora. "
+        "Default: last used, else glass. Also selectable from the menu.",
+    )
+    parser.add_argument(
         "--self-test", action="store_true",
         help="Load the model, run one inference through the engine, then exit "
         "0. Used to verify a packaged build boots without a mic/hotkey.",
@@ -123,8 +129,10 @@ def main(argv=None):
     mute = False if args.no_mute else bool(saved.get("mute", True))
     sounds = False if args.no_sounds else bool(saved.get("sounds", True))
     waveform = False if args.no_waveform else bool(saved.get("waveform", True))
+    overlay_style = args.overlay_style or saved.get("overlay_style") or "glass"
     log.info(f"prefs applied: hotkey={hotkey} mode={mode} device={device_spec!r} "
-             f"language={language!r} mute={mute} sounds={sounds} waveform={waveform}")
+             f"language={language!r} mute={mute} sounds={sounds} waveform={waveform} "
+             f"overlay={overlay_style}")
 
     device = resolve_device(device_spec)
     log.info(f"input device: '{device_name(device)}' (index={device})")
@@ -136,6 +144,7 @@ def main(argv=None):
         languages=args.languages, language=language,
         max_time=args.max_time, hotkey=hotkey, hotkey_mode=mode,
         mute_while_recording=mute, play_sounds=sounds, show_waveform=waveform,
+        overlay_style=overlay_style,
     )
 
     if args.self_test:
