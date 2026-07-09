@@ -358,18 +358,30 @@ class StatusBarApp(rumps.App):
         # worker hides it via overlay.finish() when it's done.
         if self.show_waveform:
             self._overlay.begin_loading()
-        if self.mute_while_recording:
-            # restore exactly what the user had before we muted
-            set_output_muted(bool(self._prev_muted))
-            self._prev_muted = None
         self.busy = True
-        audio = self.recorder.stop()
-        # Cue after the stream is closed (so it isn't captured) and output restored.
-        if self.play_sounds:
-            play_sound(STOP_SOUND)
-        threading.Thread(
-            target=self._transcribe_and_inject, args=(audio,), daemon=True
-        ).start()
+        # Closing the PortAudio stream (and the osascript un-mute) can block for
+        # a long time — occasionally forever. Doing it here would wedge the whole
+        # menu-bar app: its UI, the hold-to-talk event tap and even Quit all live
+        # on this single run loop, so a stuck _stop makes the icon freeze/vanish
+        # and blocks relaunch. Hand the entire blocking teardown to the worker.
+        threading.Thread(target=self._finish_and_transcribe, daemon=True).start()
+
+    def _finish_and_transcribe(self):
+        try:
+            audio = self.recorder.stop()
+            if self.mute_while_recording:
+                # restore exactly what the user had before we muted
+                set_output_muted(bool(self._prev_muted))
+                self._prev_muted = None
+            # Cue after the stream is closed (so it isn't captured) and output restored.
+            if self.play_sounds:
+                play_sound(STOP_SOUND)
+        except Exception:
+            log.exception("failed to stop recording cleanly")
+            self.busy = False
+            self._overlay.finish()
+            return
+        self._transcribe_and_inject(audio)
 
     def _transcribe_and_inject(self, audio):
         try:
