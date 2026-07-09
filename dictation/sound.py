@@ -12,9 +12,30 @@ permission.
 
 import subprocess
 
+from AppKit import NSSound
+
 from .log import get_logger
 
 log = get_logger()
+
+# Cache NSSound objects so they aren't garbage-collected mid-playback.
+_sound_cache = {}
+
+
+def play_sound(name: str) -> None:
+    """Play a named macOS system sound (e.g. 'Tink', 'Bottle') asynchronously."""
+    try:
+        snd = _sound_cache.get(name)
+        if snd is None:
+            snd = NSSound.soundNamed_(name)
+            _sound_cache[name] = snd
+        if snd is not None:
+            snd.stop()   # rewind if it's still playing
+            snd.play()
+        else:
+            log.warning(f"system sound {name!r} not found")
+    except Exception:
+        log.exception("could not play sound")
 
 
 def get_output_muted():
