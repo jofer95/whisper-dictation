@@ -6,6 +6,7 @@ starts the global hotkey listener.
 
 import argparse
 import platform
+import threading
 
 from . import __version__
 from . import prefs
@@ -107,10 +108,6 @@ def main(argv=None):
     args = parse_args(argv)
 
     log.info(f"starting whisper-dictation-hcp v{__version__}; log at {LOG_PATH}")
-    print(f"Loading model '{args.model}' (first run downloads it, then it's offline)...")
-    transcriber = Transcriber(args.model)
-    transcriber.warm_up()
-    print("Model ready.")
 
     # Merge saved preferences with CLI args (explicit CLI args win).
     saved = prefs.load()
@@ -139,21 +136,37 @@ def main(argv=None):
     recorder = Recorder(device=device)
     injector = TextInjector(mode=args.inject)
 
+    # The menu-bar icon appears immediately; the model (which may download on the
+    # very first run) loads in the background so nothing looks frozen.
     app = StatusBarApp(
-        recorder, transcriber, injector,
+        recorder, None, injector,
         languages=args.languages, language=language,
         max_time=args.max_time, hotkey=hotkey, hotkey_mode=mode,
         mute_while_recording=mute, play_sounds=sounds, show_waveform=waveform,
         overlay_style=overlay_style,
     )
 
+    def load_model():
+        try:
+            print(f"Loading model '{args.model}' (first run downloads it, then offline)...")
+            transcriber = Transcriber(args.model)
+            transcriber.warm_up()
+            app.set_transcriber(transcriber)
+            print("Model ready.")
+        except Exception as exc:
+            log.exception("model load failed")
+            app.model_failed(str(exc))
+
     if args.self_test:
+        load_model()
         import numpy as np
         print("[self-test] running one inference through the bundled engine...")
-        transcriber.transcribe(np.zeros(16000, dtype=np.float32), language="en")
+        app.transcriber.transcribe(np.zeros(16000, dtype=np.float32), language="en")
         print("[self-test] permissions:", app.check_permissions(prompt=False))
         print("SELF-TEST OK")
         return
+
+    threading.Thread(target=load_model, daemon=True).start()
 
     # Validate permissions up front: prompt (but don't force-open Settings every
     # launch — the "Grant / re-check permissions…" menu item does that on demand).

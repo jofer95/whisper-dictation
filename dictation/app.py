@@ -89,7 +89,8 @@ class StatusBarApp(rumps.App):
         self.recording = False
         self.busy = False
         self._start_time = 0.0
-        self._status = "ready"
+        self._model_ready = transcriber is not None
+        self._status = "ready" if self._model_ready else "loading model…"
         self.hotkey_spec = hotkey
         self.hotkey_mode = hotkey_mode
         self._prev_muted = None
@@ -355,6 +356,18 @@ class StatusBarApp(rumps.App):
             perms.open_settings("Privacy_Microphone")
         return ax, mic
 
+    # ---- model readiness (background load) ----
+    def set_transcriber(self, transcriber):
+        self.transcriber = transcriber
+        self._model_ready = True
+        self._status = "ready"
+        log.info("speech model ready")
+
+    def model_failed(self, err="load failed"):
+        self._model_ready = False
+        self._status = f"model {err} — see log"
+        log.error(f"model load failed: {err}")
+
     # ---- state transitions (any thread) ----
     def toggle(self):
         log.info(f"toggle fired (was recording={self.recording}, busy={self.busy})")
@@ -365,6 +378,10 @@ class StatusBarApp(rumps.App):
 
     def _start(self):
         if self.recording or self.busy:
+            return
+        if not self._model_ready:
+            self._status = "still loading the speech model — one moment…"
+            log.info("start ignored: model not ready yet")
             return
         # Cue first, while output isn't muted yet, so it's audible.
         if self.play_sounds:
@@ -433,7 +450,7 @@ class StatusBarApp(rumps.App):
 
     # ---- title + status rendering, max_time (main thread) ----
     def _tick(self, _):
-        if self.busy:
+        if self.busy or not self._model_ready:
             self.title = self.BUSY_ICON
         elif self.recording:
             elapsed = int(time.time() - self._start_time)
