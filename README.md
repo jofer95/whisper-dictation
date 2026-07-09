@@ -169,6 +169,17 @@ python -m dictation --self-test # verify a build boots & the engine runs
 
 ---
 
+## ⚠️ Known issues
+
+- **Hold-to-talk (`⌘+D`) can clash with an app's own `⌘+D` shortcut.** The
+  push-to-talk *hold* mode is bound to `⌘+D`. It tries to "swallow" the key so it
+  doesn't reach the app underneath, but a few apps still catch it — most notably
+  **Google Chrome**, where `⌘+D` bookmarks the current page (adds it to your
+  favorites). So holding to dictate while Chrome is focused may also create a
+  bookmark. **Workaround:** pick a non-conflicting shortcut from
+  **🎙️ → Shortcut** (e.g. `⌘+Option`, `⌃+Option`, or `⌃+Left Shift`), or avoid
+  hold mode while using Chrome. A user-configurable hold key is on the roadmap.
+
 ## 🙏 Credits & license
 
 Built with deep gratitude on top of:
