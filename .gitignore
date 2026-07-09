@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+
+# py2app build artifacts (regenerable via scripts/build.sh)
+build/
+dist/
+
+# macOS
+.DS_Store
+
+# Local scratch / logs
+*.log
+
+# Notes:
+# - Model weights are cached in ~/.cache/huggingface (outside the repo).
+# - User prefs live in ~/Library/Application Support/whisper-dictation-hcp/.
+# - The signing keychain/cert is created locally by scripts/sign_selfsigned.sh.
