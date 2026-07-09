@@ -72,12 +72,19 @@ class Recorder:
         self.device = device  # None => system default
         self._frames = []
         self._stream = None
+        self._level = 0.0  # latest block peak; read by the waveform overlay
+
+    def level(self):
+        """Current mic level (0..1 peak of the most recent block). 0 when idle."""
+        return self._level
 
     def _open(self, device):
         def _callback(indata, _frames, _time, status):
             if status:
                 log.warning(f"audio callback status: {status}")
             self._frames.append(indata.copy())
+            # Single float write, read on the main thread — no lock needed in CPython.
+            self._level = float(np.abs(indata).max()) if indata.size else 0.0
 
         stream = sd.InputStream(
             samplerate=SAMPLE_RATE,
@@ -109,6 +116,7 @@ class Recorder:
             self._stream.stop()
             self._stream.close()
             self._stream = None
+        self._level = 0.0
 
         if not self._frames:
             log.warning("recording stopped with no frames captured")

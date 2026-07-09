@@ -46,6 +46,15 @@ class TextInjector:
             log.exception("text injection failed (grant Accessibility permission?)")
             raise
 
+    def copy(self, text: str) -> None:
+        """Put text on the clipboard without pasting (used by the History menu,
+        so it stays there for a manual ⌘V — unlike insert()'s paste-and-restore)."""
+        if not text:
+            return
+        pb = NSPasteboard.generalPasteboard()
+        pb.clearContents()
+        pb.setString_forType_(text, NSPasteboardTypeString)
+
     def _insert_by_typing(self, text: str) -> None:
         for ch in text:
             try:
