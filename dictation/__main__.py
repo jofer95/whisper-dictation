@@ -67,6 +67,10 @@ def parse_args(argv=None):
         "muted during capture so music doesn't leak into the mic.",
     )
     parser.add_argument(
+        "--no-sounds", action="store_true",
+        help="Do NOT play the start/stop audio cues (on by default).",
+    )
+    parser.add_argument(
         "--self-test", action="store_true",
         help="Load the model, run one inference through the engine, then exit "
         "0. Used to verify a packaged build boots without a mic/hotkey.",
@@ -102,8 +106,9 @@ def main(argv=None):
     device_spec = args.device if args.device is not None else saved.get("device")
     language = args.language if args.language is not None else saved.get("language")
     mute = False if args.no_mute else bool(saved.get("mute", True))
+    sounds = False if args.no_sounds else bool(saved.get("sounds", True))
     log.info(f"prefs applied: hotkey={hotkey} device={device_spec!r} "
-             f"language={language!r} mute={mute}")
+             f"language={language!r} mute={mute} sounds={sounds}")
 
     device = resolve_device(device_spec)
     log.info(f"input device: '{device_name(device)}' (index={device})")
@@ -114,7 +119,7 @@ def main(argv=None):
         recorder, transcriber, injector,
         languages=args.languages, language=language,
         max_time=args.max_time, hotkey=hotkey,
-        mute_while_recording=mute,
+        mute_while_recording=mute, play_sounds=sounds,
     )
 
     if args.self_test:

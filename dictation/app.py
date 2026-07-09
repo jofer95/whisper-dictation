@@ -18,12 +18,16 @@ from . import prefs
 from .hotkey import HotkeyMonitor
 from .log import get_logger
 from .recorder import list_input_devices, device_name
-from .sound import get_output_muted, set_output_muted
+from .sound import get_output_muted, set_output_muted, play_sound
 
 log = get_logger()
 
 # Below this peak amplitude we treat the clip as "no audio" (wrong mic / no perm).
 SILENCE_PEAK = 0.005
+
+# Audio cues (macOS system sounds) for start/stop of recording.
+START_SOUND = "Tink"
+STOP_SOUND = "Bottle"
 
 # Selectable shortcuts: (menu label, spec). "double_cmd" is the special
 # double-tap Right Command mode; everything else is a combo of tokens joined by
@@ -46,7 +50,7 @@ class StatusBarApp(rumps.App):
 
     def __init__(self, recorder, transcriber, injector,
                  languages=None, language=None, max_time=60, hotkey="cmd+alt",
-                 mute_while_recording=True):
+                 mute_while_recording=True, play_sounds=True):
         super().__init__("Whisper Dictation", title=self.IDLE_ICON, quit_button="Quit")
         self.recorder = recorder
         self.transcriber = transcriber
@@ -55,6 +59,7 @@ class StatusBarApp(rumps.App):
         self.current_language = language
         self.max_time = max_time
         self.mute_while_recording = mute_while_recording
+        self.play_sounds = play_sounds
 
         self.recording = False
         self.busy = False
@@ -108,6 +113,10 @@ class StatusBarApp(rumps.App):
             "Mute audio while recording", callback=self._on_mute_toggle_clicked)
         self._mute_item.state = 1 if self.mute_while_recording else 0
 
+        self._sounds_item = rumps.MenuItem(
+            "Play start/stop sounds", callback=self._on_sounds_toggle_clicked)
+        self._sounds_item.state = 1 if self.play_sounds else 0
+
         self.menu = [
             rumps.MenuItem("Start Dictation", callback=self._on_start_clicked),
             rumps.MenuItem("Stop Dictation", callback=self._on_stop_clicked),
@@ -116,6 +125,7 @@ class StatusBarApp(rumps.App):
             ("Shortcut", shortcut_items),
             ("Language", lang_items),
             self._mute_item,
+            self._sounds_item,
             None,
             self._status_item,
             self._perms_item,
@@ -148,6 +158,7 @@ class StatusBarApp(rumps.App):
             "hotkey": self.hotkey_spec,
             "language": self.current_language,
             "mute": self.mute_while_recording,
+            "sounds": self.play_sounds,
         })
 
     def _on_device_clicked(self, sender):
@@ -180,6 +191,14 @@ class StatusBarApp(rumps.App):
         self.mute_while_recording = not self.mute_while_recording
         sender.state = 1 if self.mute_while_recording else 0
         log.info(f"mute-while-recording = {self.mute_while_recording}")
+        self._save_prefs()
+
+    def _on_sounds_toggle_clicked(self, sender):
+        self.play_sounds = not self.play_sounds
+        sender.state = 1 if self.play_sounds else 0
+        log.info(f"play-sounds = {self.play_sounds}")
+        if self.play_sounds:
+            play_sound(START_SOUND)  # preview when enabling
         self._save_prefs()
 
     def _on_grant_clicked(self, _):
@@ -217,6 +236,9 @@ class StatusBarApp(rumps.App):
     def _start(self):
         if self.recording or self.busy:
             return
+        # Cue first, while output isn't muted yet, so it's audible.
+        if self.play_sounds:
+            play_sound(START_SOUND)
         try:
             self.recorder.start()
         except Exception as exc:
@@ -239,6 +261,9 @@ class StatusBarApp(rumps.App):
             self._prev_muted = None
         self.busy = True
         audio = self.recorder.stop()
+        # Cue after the stream is closed (so it isn't captured) and output restored.
+        if self.play_sounds:
+            play_sound(STOP_SOUND)
         threading.Thread(
             target=self._transcribe_and_inject, args=(audio,), daemon=True
         ).start()
