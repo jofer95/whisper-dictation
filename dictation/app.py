@@ -46,7 +46,12 @@ SHORTCUTS = [
     ("⌘ + Shift", "cmd+shift"),
     ("⌥ + Space", "alt+space"),
     ("Double-tap Right ⌘", "double_cmd"),
-    ("⌘ + D (hold to talk)", "hold:cmd+d"),
+]
+
+# Activation modes — apply to whichever shortcut is selected.
+MODES = [
+    ("Toggle (tap on / tap off)", "toggle"),
+    ("Hold (push-to-talk)", "hold"),
 ]
 
 
@@ -57,7 +62,8 @@ class StatusBarApp(rumps.App):
 
     def __init__(self, recorder, transcriber, injector,
                  languages=None, language=None, max_time=60, hotkey="cmd+alt",
-                 mute_while_recording=True, play_sounds=True, show_waveform=True):
+                 hotkey_mode="toggle", mute_while_recording=True,
+                 play_sounds=True, show_waveform=True):
         super().__init__("Whisper Dictation", title=self.IDLE_ICON, quit_button="Quit")
         self.recorder = recorder
         self.transcriber = transcriber
@@ -75,9 +81,12 @@ class StatusBarApp(rumps.App):
         self._start_time = 0.0
         self._status = "ready"
         self.hotkey_spec = hotkey
+        self.hotkey_mode = hotkey_mode
         self._prev_muted = None
         self._ax_ok = False
-        self._hotkey = HotkeyMonitor(self.toggle, is_recording=lambda: self.recording)
+        self._hotkey = HotkeyMonitor(
+            self.toggle, self._start, self._stop,
+            is_recording=lambda: self.recording)
 
         # --- microphone submenu (System Default + every input device) ---
         self._device_by_label = {"System Default": None}
@@ -101,6 +110,15 @@ class StatusBarApp(rumps.App):
             item = rumps.MenuItem(label, callback=self._on_shortcut_clicked)
             item.state = 1 if spec == hotkey else 0
             shortcut_items.append(item)
+
+        # --- mode submenu (toggle vs push-to-talk) ---
+        self._mode_by_label = {}
+        mode_items = []
+        for label, mode in MODES:
+            self._mode_by_label[label] = mode
+            item = rumps.MenuItem(label, callback=self._on_mode_clicked)
+            item.state = 1 if mode == self.hotkey_mode else 0
+            mode_items.append(item)
 
         # --- language submenu (Auto is best for mixed ES/EN; never translates) ---
         self._lang_by_label = {"Auto (mixed languages)": None, "Español": "es", "English": "en"}
@@ -144,6 +162,7 @@ class StatusBarApp(rumps.App):
             None,
             ("Microphone", device_items),
             ("Shortcut", shortcut_items),
+            ("Mode", mode_items),
             ("Language", lang_items),
             self._mute_item,
             self._sounds_item,
@@ -164,9 +183,12 @@ class StatusBarApp(rumps.App):
         self._clock.start()
 
     # ---- hotkey management ----
-    def apply_hotkey(self, spec):
-        self._hotkey.set_combo(spec)
-        self.hotkey_spec = spec
+    def apply_hotkey(self, spec=None, mode=None):
+        if spec is not None:
+            self.hotkey_spec = spec
+        if mode is not None:
+            self.hotkey_mode = mode
+        self._hotkey.set_combo(self.hotkey_spec, self.hotkey_mode)
 
     # ---- menu callbacks (main thread) ----
     def _on_start_clicked(self, _):
@@ -180,6 +202,7 @@ class StatusBarApp(rumps.App):
         prefs.save({
             "device": dev,
             "hotkey": self.hotkey_spec,
+            "mode": self.hotkey_mode,
             "language": self.current_language,
             "mute": self.mute_while_recording,
             "sounds": self.play_sounds,
@@ -199,10 +222,21 @@ class StatusBarApp(rumps.App):
         spec = self._spec_by_label.get(sender.title)
         if spec is None:
             return
-        self.apply_hotkey(spec)
+        self.apply_hotkey(spec=spec)
         for label in self._spec_by_label:
             self.menu["Shortcut"][label].state = 1 if label == sender.title else 0
         self._status = f"shortcut: {sender.title}"
+        self._save_prefs()
+
+    def _on_mode_clicked(self, sender):
+        mode = self._mode_by_label.get(sender.title)
+        if mode is None:
+            return
+        self.apply_hotkey(mode=mode)
+        for label in self._mode_by_label:
+            self.menu["Mode"][label].state = 1 if label == sender.title else 0
+        self._status = f"mode: {sender.title}"
+        log.info(f"activation mode = {mode}")
         self._save_prefs()
 
     def _on_language_clicked(self, sender):

@@ -1,17 +1,20 @@
-"""Global hotkey via AppKit NSEvent monitors, plus a Quartz event tap for the
-push-to-talk ("hold") mode.
+"""Global hotkey via AppKit NSEvent monitors, plus a Quartz event tap for
+push-to-talk ("hold") on key combos.
+
+Two activation modes apply to whatever shortcut is selected:
+
+  * toggle — press once to start, press again to stop.
+  * hold   — keep the combo held to dictate; release to stop (push-to-talk).
 
 pynput's event-tap listener does not fire from inside a py2app bundle, so we use
-NSEvent global/local monitors instead. They run on the app's main run loop (which
-rumps already drives) and only need Accessibility permission — the reliable way
-to observe global hotkeys from a menu-bar app.
+NSEvent global/local monitors. They run on the app's main run loop (which rumps
+drives) and only need Accessibility permission.
 
-Monitors are observe-only: they cannot swallow the event, so a key combo also
-reaches the focused app. The hold mode instead installs a CGEventTap, which CAN
-consume the matching key-down — so ⌘+D drives dictation without also triggering
-the app underneath (e.g. Claude, Finder's "Duplicate"). If the tap can't be
-created, it falls back to the plain key-combo monitor (non-consuming,
-tap-to-start/tap-to-stop rather than true hold).
+Monitors are observe-only (they can't swallow the event). For HOLD on a *key*
+combo (e.g. ⌘+D) that would also do something in the focused app, we instead
+install a CGEventTap that consumes the key-down. Modifier-only hold (e.g. hold
+⌘+Option) needs no tap — modifiers alone don't trigger app actions — so it runs
+on the plain monitor via the rising/falling edge of the modifier flags.
 
 Modifiers are matched by the device-dependent bits in `modifierFlags`, so left
 and right sides are distinguished: 'shift_l' = physical left shift, while bare
@@ -37,7 +40,10 @@ from Quartz import (
     CGEventTapCreate,
     CGEventTapEnable,
     kCFRunLoopCommonModes,
+    kCGEventFlagMaskAlternate,
     kCGEventFlagMaskCommand,
+    kCGEventFlagMaskControl,
+    kCGEventFlagMaskShift,
     kCGEventFlagsChanged,
     kCGEventKeyDown,
     kCGEventTapDisabledByTimeout,
@@ -64,16 +70,22 @@ _BASE_FLAG = {
 }
 _RIGHT_CMD = 0x10
 
-# For the hold event tap: modifier token -> CGEvent flag mask, and key -> macOS
-# virtual keycode. Only what the sole hold shortcut (⌘+D) needs — add entries
-# here when another hold combo is offered.
-_CG_MOD = {"cmd": kCGEventFlagMaskCommand}
+# For the hold event tap (key combos only): modifier token -> CGEvent flag mask,
+# and non-modifier key -> macOS virtual keycode.
+_CG_MOD = {
+    "cmd": kCGEventFlagMaskCommand, "cmd_l": kCGEventFlagMaskCommand, "cmd_r": kCGEventFlagMaskCommand,
+    "ctrl": kCGEventFlagMaskControl, "ctrl_l": kCGEventFlagMaskControl, "ctrl_r": kCGEventFlagMaskControl,
+    "alt": kCGEventFlagMaskAlternate, "alt_l": kCGEventFlagMaskAlternate, "alt_r": kCGEventFlagMaskAlternate,
+    "shift": kCGEventFlagMaskShift, "shift_l": kCGEventFlagMaskShift, "shift_r": kCGEventFlagMaskShift,
+}
 _KEYCODE = {"d": 2, "space": 49}
 
 
 class HotkeyMonitor:
-    def __init__(self, on_trigger, is_recording=None):
-        self._on_trigger = on_trigger
+    def __init__(self, on_toggle, on_start, on_stop, is_recording=None):
+        self._on_toggle = on_toggle
+        self._on_start = on_start
+        self._on_stop = on_stop
         self._is_recording = is_recording or (lambda: False)
         self._global = None
         self._local = None
@@ -83,9 +95,9 @@ class HotkeyMonitor:
 
     def _reset(self):
         self._required_mods = []   # list of bitmasks; combo needs at least one bit of each
-        self._required_key = None  # non-modifier token (e.g. "space", "k") or None
+        self._required_key = None  # non-modifier token (e.g. "space", "d") or None
         self._double_cmd = False
-        self._hold = False         # push-to-talk: hold the modifier to keep dictating
+        self._hold = False         # push-to-talk mode
         self._held = False
         self._hold_mask = 0        # CGEvent modifier mask required for the hold combo
         self._hold_keycode = None  # virtual keycode that starts the hold combo
@@ -93,17 +105,21 @@ class HotkeyMonitor:
         self._rcmd_down = False
         self._last_rcmd = 0.0
 
-    def set_combo(self, spec):
+    def set_combo(self, spec, mode="toggle"):
         self._remove()
         self._reset()
+        # Legacy "hold:cmd+d" specs imply hold mode.
+        if spec.startswith("hold:"):
+            mode = "hold"
+            spec = spec[len("hold:"):]
+        self._hold = (mode == "hold")
+
         if spec == "double_cmd":
             self._double_cmd = True
             self._install()
-            log.info("hotkey set to double_cmd")
+            log.info(f"hotkey set to double_cmd (mode={mode})")
             return
-        if spec.startswith("hold:"):   # "hold:cmd+d" = hold ⌘ to keep dictating
-            self._hold = True
-            spec = spec[len("hold:"):]
+
         tokens = [t.strip().lower() for t in spec.split("+") if t.strip()]
         for token in tokens:
             if token in _SIDE_FLAG:
@@ -112,17 +128,17 @@ class HotkeyMonitor:
                 self._required_mods.append(_BASE_FLAG[token])
             else:
                 self._required_key = token
-        if self._hold:
+        if self._hold and self._required_key is not None:
             for token in tokens:
                 self._hold_mask |= _CG_MOD.get(token, 0)
             self._hold_keycode = _KEYCODE.get(self._required_key)
         self._install()
-        log.info(f"hotkey set to {spec}")
+        log.info(f"hotkey set to {spec} (mode={mode})")
 
     def _install(self):
-        # Hold mode prefers a consuming event tap; fall back to the monitor if it
-        # can't be created (e.g. Accessibility not yet granted).
-        if self._hold and self._install_tap():
+        # Key-combo hold prefers a consuming tap; modifier-only hold and all
+        # toggle combos use the observe-only monitors.
+        if self._hold and self._required_key is not None and self._install_tap():
             return
         self._install_monitors()
 
@@ -130,16 +146,13 @@ class HotkeyMonitor:
         mask = NSEventMaskFlagsChanged
         if self._required_key is not None:
             mask |= NSEventMaskKeyDown
-        # Global monitor: events while OTHER apps are focused (the usual case).
         self._global = NSEvent.addGlobalMonitorForEventsMatchingMask_handler_(
             mask, self._on_global)
-        # Local monitor: events while our (menu-bar) app is focused; must return
-        # the event so it isn't swallowed.
         self._local = NSEvent.addLocalMonitorForEventsMatchingMask_handler_(
             mask, self._on_local)
 
     def _install_tap(self):
-        if self._hold_keycode is None:
+        if self._hold_keycode is None or self._hold_mask == 0:
             return False
         mask = CGEventMaskBit(kCGEventKeyDown) | CGEventMaskBit(kCGEventFlagsChanged)
         tap = CGEventTapCreate(
@@ -189,23 +202,26 @@ class HotkeyMonitor:
             mods_ok = all(flags & m for m in self._required_mods) if self._required_mods else True
 
             if self._required_key is None:
-                # Modifier-only combo: fire once on the rising edge.
+                # Modifier-only combo.
                 if mods_ok and not self._mods_satisfied:
                     self._mods_satisfied = True
-                    self._on_trigger()
-                elif not mods_ok:
+                    self._on_start() if self._hold else self._on_toggle()
+                elif not mods_ok and self._mods_satisfied:
                     self._mods_satisfied = False
+                    if self._hold:
+                        self._on_stop()
             elif event.type() == NSEventTypeKeyDown:
+                # Key combo in toggle mode (hold+key uses the tap path instead).
                 chars = (event.charactersIgnoringModifiers() or "").lower()
                 wanted = " " if self._required_key == "space" else self._required_key
                 if mods_ok and chars == wanted:
-                    self._on_trigger()
+                    self._on_toggle()
         except Exception:
             log.exception("hotkey processing failed")
 
     def _tap_callback(self, proxy, etype, event, refcon):
-        """CGEventTap handler. Returns None to SWALLOW the matching key-down (so
-        the focused app never sees ⌘+D); returns the event otherwise."""
+        """Consuming tap for hold-mode key combos: swallow the key-down so the
+        focused app never sees it; start on press, stop on modifier release."""
         try:
             if etype == kCGEventKeyDown:
                 keycode = CGEventGetIntegerValueField(event, kCGKeyboardEventKeycode)
@@ -213,14 +229,14 @@ class HotkeyMonitor:
                 if keycode == self._hold_keycode and (flags & self._hold_mask) == self._hold_mask:
                     if not self._held:
                         self._held = True
-                        self._on_trigger()          # press -> start
-                    return None                     # swallow: don't leak to other apps
+                        self._on_start()
+                    return None  # swallow
             elif etype == kCGEventFlagsChanged:
                 if self._held:
                     flags = CGEventGetFlags(event)
                     if (flags & self._hold_mask) != self._hold_mask:
                         self._held = False
-                        self._on_trigger()          # modifier released -> stop
+                        self._on_stop()
             elif etype in (kCGEventTapDisabledByTimeout, kCGEventTapDisabledByUserInput):
                 if self._tap is not None:
                     CGEventTapEnable(self._tap, True)  # macOS may disable us; re-arm
@@ -233,9 +249,9 @@ class HotkeyMonitor:
         if down and not self._rcmd_down:  # rising edge = a press
             now = time.time()
             if self._is_recording():
-                self._on_trigger()                     # single tap stops
+                self._on_toggle()                      # single tap stops
             elif now - self._last_rcmd < 0.5:
-                self._on_trigger()                     # double tap starts
+                self._on_toggle()                      # double tap starts
             self._last_rcmd = now
         self._rcmd_down = down
 

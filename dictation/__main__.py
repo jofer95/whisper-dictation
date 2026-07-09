@@ -42,6 +42,11 @@ def parse_args(argv=None):
         "(overrides --key-combination).",
     )
     parser.add_argument(
+        "--hold", action="store_true",
+        help="Push-to-talk: hold the shortcut to dictate, release to stop "
+        "(default is toggle: tap on / tap off). Also selectable from the menu.",
+    )
+    parser.add_argument(
         "-l", "--language", default=None,
         help="Force a language (e.g. 'es' or 'en'). Comma-separate to offer a "
         "switcher menu (first is default). Omit to auto-detect per utterance.",
@@ -108,12 +113,17 @@ def main(argv=None):
         hotkey = "double_cmd"
     else:
         hotkey = args.key_combination or saved.get("hotkey") or default_hotkey
+    mode = "hold" if args.hold else saved.get("mode", "toggle")
+    # Migrate the legacy "hold:cmd+d" spec to (spec, mode) so menus stay in sync.
+    if hotkey.startswith("hold:"):
+        hotkey = hotkey[len("hold:"):]
+        mode = "hold"
     device_spec = args.device if args.device is not None else saved.get("device")
     language = args.language if args.language is not None else saved.get("language")
     mute = False if args.no_mute else bool(saved.get("mute", True))
     sounds = False if args.no_sounds else bool(saved.get("sounds", True))
     waveform = False if args.no_waveform else bool(saved.get("waveform", True))
-    log.info(f"prefs applied: hotkey={hotkey} device={device_spec!r} "
+    log.info(f"prefs applied: hotkey={hotkey} mode={mode} device={device_spec!r} "
              f"language={language!r} mute={mute} sounds={sounds} waveform={waveform}")
 
     device = resolve_device(device_spec)
@@ -124,7 +134,7 @@ def main(argv=None):
     app = StatusBarApp(
         recorder, transcriber, injector,
         languages=args.languages, language=language,
-        max_time=args.max_time, hotkey=hotkey,
+        max_time=args.max_time, hotkey=hotkey, hotkey_mode=mode,
         mute_while_recording=mute, play_sounds=sounds, show_waveform=waveform,
     )
 

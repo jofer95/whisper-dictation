@@ -94,6 +94,7 @@ first launch. After that, pull the Wi-Fi plug and it keeps working forever.
 - 🌎 **Multilingual, no translation** — speak English, Spanish, or *spanglish* and it writes exactly what you said.
 - 🎚️ **Pick any microphone** from the menu (USB, Continuity Camera, built-in…).
 - ⌨️ **Configurable shortcut** — `⌘+Option`, `⌃+Option`, `⌃+Left Shift`, double-tap Right ⌘, and more.
+- 🎙️ **Toggle *or* push-to-talk** — tap on / tap off, or **hold** the shortcut to dictate and release to stop (Mode menu).
 - 🔇 **Auto-mutes your music** while recording, then restores it (so songs don't leak into the mic).
 - 🔔 **Audio cues** on start/stop so you know it's listening — without looking.
 - 💾 **Remembers your settings** (mic, shortcut, language, mute, sounds) between launches.
@@ -138,7 +139,8 @@ Look for 🎙️ in the menu bar. Everything is adjustable live from its menu:
 |---|---|
 | **Start / Stop Dictation** | Toggle recording by mouse (same as the shortcut). |
 | **Microphone** | Choose your input device. |
-| **Shortcut** | Change the toggle keys. |
+| **Shortcut** | Change the activation keys. |
+| **Mode** | **Toggle** (tap on/off) or **Hold** (push-to-talk). |
 | **Language** | Auto (best for mixing), Español, or English. |
 | **Mute audio while recording** | Silence output during capture. |
 | **Play start/stop sounds** | The *Tink* / *Bottle* cues. |
@@ -171,14 +173,14 @@ python -m dictation --self-test # verify a build boots & the engine runs
 
 ## ⚠️ Known issues
 
-- **Hold-to-talk (`⌘+D`) can clash with an app's own `⌘+D` shortcut.** The
-  push-to-talk *hold* mode is bound to `⌘+D`. It tries to "swallow" the key so it
-  doesn't reach the app underneath, but a few apps still catch it — most notably
-  **Google Chrome**, where `⌘+D` bookmarks the current page (adds it to your
-  favorites). So holding to dictate while Chrome is focused may also create a
-  bookmark. **Workaround:** pick a non-conflicting shortcut from
-  **🎙️ → Shortcut** (e.g. `⌘+Option`, `⌃+Option`, or `⌃+Left Shift`), or avoid
-  hold mode while using Chrome. A user-configurable hold key is on the roadmap.
+- **Use Hold (push-to-talk) with a modifier-only shortcut.** In
+  **🎙️ → Mode → Hold**, you hold the shortcut to dictate and release to stop.
+  Pick a modifier-only combo like `⌘+Option` or `⌃+Left Shift` — those never
+  clash with the app underneath. If you use Hold with a shortcut that includes a
+  regular key (e.g. `⌥+Space`), the app tries to "swallow" the key, but a few
+  apps may still catch it — for example **Google Chrome**, where some keys are
+  bound to actions (`⌘+D` bookmarks a page). When in doubt for Hold mode, stick
+  to a modifier-only shortcut.
 
 ## 🙏 Credits & license
 
