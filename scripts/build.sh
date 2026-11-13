@@ -6,6 +6,8 @@ cd "$(dirname "$0")/.."
 
 source .venv/bin/activate
 rm -rf build dist
+# On-device AI cleanup helper (needs Xcode 26+); the app builds without it.
+packaging/aicleanup/build.sh || echo "⚠️  AI cleanup helper not built — continuing without it"
 python setup.py py2app
 scripts/sign_selfsigned.sh "dist/Whisper Dictation.app"
 

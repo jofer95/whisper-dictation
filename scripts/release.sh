@@ -32,6 +32,9 @@ TS="--timestamp"
 echo "==> Building (py2app) ..."
 source .venv/bin/activate
 rm -rf build dist
+# On-device AI cleanup helper (Swift, Xcode 26+). Lands in Resources/aicleanup;
+# the Mach-O loop below signs it with Hardened Runtime like everything else.
+packaging/aicleanup/build.sh
 python setup.py py2app >/dev/null
 
 sign() { codesign --force $TS --options runtime --sign "$DEV_ID" "$@"; }

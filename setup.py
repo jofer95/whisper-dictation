@@ -13,6 +13,8 @@ Apple requires. To sign + notarize later:
     xcrun notarytool submit ... && xcrun stapler staple "dist/Whisper Dictation.app"
 """
 
+import os
+
 from setuptools import setup
 
 APP = ["app_main.py"]
@@ -34,6 +36,18 @@ PACKAGES = [
     "pynput",
     "AVFoundation",  # microphone permission status/request
 ]
+
+# Optional on-device AI cleanup helper (Swift / Foundation Models, macOS 26+).
+# Built by packaging/aicleanup/build.sh (scripts/build.sh runs it); lands in
+# Contents/Resources/aicleanup, where dictation/aicleanup.py looks for it. If it
+# isn't built (no Xcode 26 SDK), the app still builds — the toggle just reports
+# "helper not installed" and dictation uses the rule-based clean-up.
+AICLEANUP = "packaging/aicleanup/build/aicleanup"
+DATA_FILES = []
+if os.path.isfile(AICLEANUP):
+    DATA_FILES.append(("", [AICLEANUP]))
+else:
+    print(f"WARNING: {AICLEANUP} not built — the .app will ship without AI cleanup")
 
 PLIST = {
     "CFBundleName": "Whisper Dictation",
@@ -59,6 +73,7 @@ OPTIONS = {
 setup(
     name="Whisper Dictation",
     app=APP,
+    data_files=DATA_FILES,
     options={"py2app": OPTIONS},
     setup_requires=["py2app"],
 )

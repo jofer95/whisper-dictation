@@ -97,6 +97,7 @@ first launch. After that, pull the Wi-Fi plug and it keeps working forever.
 - ⎋ **Esc cancels**, **⌃⌘V pastes the last transcript**, and if your shortcut turns out to be part of another one (⌘⌥Esc, Fn+Delete…) the recording is silently dropped.
 - 🌐 **Fn / Globe key** as the shortcut (the app tells you if macOS needs “Press 🌐 key to → Do Nothing”).
 - 🧹 **Offline cleanup** — removes *um / uh / eh / mmm*, stutters (“the the”), and understands **“scratch that” / “borra eso”**, **“new line” / “nueva línea”**, **“new paragraph” / “punto y aparte”**, and corrections like *“at 2, actually 3”* → *“at 3”*.
+- 🤖 **AI cleanup (optional, off by default)** — on macOS 26+ with Apple Intelligence, an on-device pass with Apple's own model fixes grammar and punctuation, catches self-corrections the rules miss and formats spoken lists. Still 100% offline. It never translates (mixed Spanish/English stays mixed), and if it takes longer than 1.5 s (up to 4 s for long dictations), is unavailable or its answer looks off, you get the rule-based text instead. **🎙️ → Smart formatting → AI cleanup**.
 - 📖 **Dictionary & snippets** — teach it names and jargon (“Acme Cloud”, not “Akmi Cloud”), fix words it keeps mishearing, and say a trigger to insert saved text. Hot-reloads, no restart.
 - 🧭 **Context-aware** — reads the few characters around your cursor (Accessibility, nothing stored) to add the right space, lowercase *“And”* mid-sentence, drop the final period mid-line, and skip the final period in chat apps (Slack, Messages, WhatsApp, Teams…). Never pastes into password fields.
 - 🌎 **Español + English** — auto-detect restricted to the languages you speak (no more Portuguese guesses on short clips), never translates.
@@ -202,7 +203,8 @@ Save it and your next dictation uses it.
 ./scripts/build.sh              # py2app build + stable self-signed code signature
 python -m dictation --help      # all CLI options
 python -m dictation --self-test # verify a build boots & the engine runs
-python -m unittest discover -s tests   # cleanup rules + shortcut state machine
+python -m unittest discover -s tests   # cleanup rules + shortcut state machine + AI fallback
+AICLEANUP_LIVE=1 python -m unittest tests.test_aicleanup.Live  # real on-device model
 # Full pipeline without a mic: plays a WAV through transcription → cleanup →
 # paste into the focused app (run the built .app so it has Accessibility):
 open "dist/Whisper Dictation.app" --args --simulate clip.wav
@@ -210,7 +212,9 @@ open "dist/Whisper Dictation.app" --args --simulate clip.wav
 
 - `dictation/` — the app: `transcriber` (faster-whisper), `recorder` (sounddevice),
   `injector` (clipboard paste), `hotkey` (event tap + trigger state machine),
-  `textproc` (offline cleanup), `context` (Accessibility cursor context),
+  `textproc` (offline cleanup), `aicleanup` (optional on-device LLM pass via the
+  Swift helper in `packaging/aicleanup/` — Foundation Models, macOS 26+, built by
+  `scripts/build.sh`, bundled into `Contents/Resources/`), `context` (Accessibility cursor context),
   `store` (dictionary / history / stats), `overlay` (the pill), `app` (rumps menu bar),
   `sound`, `perms`, `prefs`, `log`.
 - `scripts/sign_selfsigned.sh` — creates a stable signing identity so macOS keeps

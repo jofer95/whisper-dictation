@@ -19,6 +19,7 @@ import time
 import numpy as np
 import rumps
 
+from . import aicleanup
 from . import context as axcontext
 from . import perms
 from . import prefs
@@ -87,6 +88,7 @@ TOGGLES = {
     "commands": ("Voice commands (new line, scratch that, 2-no-3)", True),
     "context": ("Match surrounding text (spacing, capitals)", True),
     "casual": ("Casual punctuation in chat apps", True),
+    "ai_cleanup": ("AI cleanup — on-device Apple Intelligence (macOS 26+)", False),
 }
 
 
@@ -119,6 +121,7 @@ class StatusBarApp(rumps.App):
         self.history = History(enabled=self.s["history"])
         self.stats = Stats()
         self._overlay = WaveformOverlay(recorder.level, style=self.s["overlay_style"])
+        self._ai = aicleanup.AICleanup()
 
         self.recording = False
         self.busy = False
@@ -148,6 +151,8 @@ class StatusBarApp(rumps.App):
 
         self._clock = rumps.Timer(self._tick, 1)
         self._clock.start()
+        if self.s["ai_cleanup"]:
+            self._ai.warm()
 
     # ================================================================ menu ==
     def _build_menu(self):
@@ -340,6 +345,33 @@ class StatusBarApp(rumps.App):
         self.s[sender._key] = not self.s[sender._key]
         sender.state = 1 if self.s[sender._key] else 0
         self._save()
+        if sender._key == "ai_cleanup" and self.s["ai_cleanup"]:
+            self._status = "AI cleanup: checking Apple Intelligence…"
+            threading.Thread(target=self._check_ai, args=(sender,), name="ai-check",
+                             daemon=True).start()
+
+    def _check_ai(self, item):
+        """Background: confirm the on-device model is usable; if not, turn the
+        toggle back off and say why (on the main thread)."""
+        ok, reason = self._ai.availability()
+        log.info(f"AI cleanup availability: {ok} ({reason})")
+        from PyObjCTools import AppHelper
+        if ok:
+            self._status = "AI cleanup on (on-device)"
+            self._ai.warm()
+            return
+
+        def off():
+            self.s["ai_cleanup"] = False
+            item.state = 0
+            self._save()
+            self._status = f"AI cleanup unavailable: {reason}"
+            rumps.alert(title="AI cleanup isn't available on this Mac",
+                        message=(f"{reason[:1].upper()}{reason[1:]}.\n\nAI cleanup uses Apple's "
+                                 "on-device model (Apple Intelligence, macOS 26+ on Apple "
+                                 "silicon). Turn on Apple Intelligence in System Settings, "
+                                 "then try again. Rule-based clean-up keeps working."))
+        AppHelper.callAfter(off)
 
     def _on_overlay_clicked(self, sender):
         self.s["overlay_style"] = sender._value
@@ -456,6 +488,8 @@ class StatusBarApp(rumps.App):
         self._warned_limit = False
         if self.s["waveform"]:
             self._overlay.show()
+        if self.s["ai_cleanup"]:
+            self._ai.warm()             # load the model while you talk
         self._jobs.put((self._job_open, self._session))
         return True
 
@@ -600,6 +634,9 @@ class StatusBarApp(rumps.App):
             self._record(text, raw, lang, seconds, ctx)
             return
 
+        if self.s["ai_cleanup"]:
+            text = self._ai_clean(text, lang, ctx)
+
         final = text
         if self.s["context"]:
             final = textproc.apply_context(
@@ -626,6 +663,22 @@ class StatusBarApp(rumps.App):
         else:
             self._status = f'inserted: "{text[:40]}"'
             self._overlay.finish()
+
+    def _ai_clean(self, text, lang, ctx):
+        """Optional on-device LLM pass. Always returns usable text: the
+        rule-based `text` itself on any failure or timeout."""
+        chat = self.s["casual"] and ctx.bundle_id in textproc.CHAT_BUNDLES
+        try:
+            res = self._ai.clean(text, language=lang, style="casual" if chat else "default")
+        except Exception:                 # belt and braces: clean() shouldn't raise
+            log.exception("AI cleanup crashed")
+            return text
+        if res.used:
+            log.info(f"AI cleanup ok in {res.latency:.2f}s: {text!r} -> {res.text!r}")
+        else:
+            log.info(f"AI cleanup skipped after {res.latency:.2f}s ({res.reason}); "
+                     f"using rule-based text")
+        return res.text
 
     def _record(self, text, raw, lang, seconds, ctx):
         self.history.add(text, raw=raw, lang=lang, app=ctx.bundle_id, secs=round(seconds, 1))

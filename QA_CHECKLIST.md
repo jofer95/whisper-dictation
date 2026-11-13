@@ -84,3 +84,14 @@ Legend: ⌘⌥ = default toggle. "Status" = the menu's `Status:` line.
 - [ ] Two monitors: pill appears above the Dock on the screen with the mouse.
 - [ ] `python -m unittest discover -s tests` passes.
 
+
+## AI cleanup (optional, on-device — macOS 26+, Apple Intelligence)
+
+- [ ] Off by default on a fresh install (no `ai_cleanup` in prefs) — dictation behaves exactly as before.
+- [ ] Smart formatting → AI cleanup ON, on a Mac with Apple Intelligence: dictate "let's meet at 2 actually 3 on Thursday" → "Let's meet at 3 on Thursday."; log shows `AI cleanup ok in X.XXs`.
+- [ ] Mixed ES/EN sentence ("oye podemos hacer el deploy mañana porque el build de staging is still failing") → punctuation fixed, nothing translated.
+- [ ] Dictate a question ("what time is the meeting") → the question is inserted, not an answer.
+- [ ] Apple Intelligence off (or macOS < 26) → turning the toggle on shows an alert and it switches back off; dictation keeps working.
+- [ ] `--self-test` on the built .app prints `AI cleanup helper: …/Contents/Resources/aicleanup; available: (True, 'ok')`.
+- [ ] Release build: `codesign -dvv "dist/Whisper Dictation.app/Contents/Resources/aicleanup"` shows the Developer ID and `flags=0x10000(runtime)`.
+- [ ] `AICLEANUP_LIVE=1 python -m unittest tests.test_aicleanup.Live` passes.

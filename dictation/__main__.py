@@ -31,6 +31,7 @@ DEFAULTS = {
     "commands": True,
     "context": True,
     "casual": True,
+    "ai_cleanup": False,       # on-device Apple Intelligence pass (macOS 26+), opt-in
     "history": True,
     "max_time": 20 * 60,
 }
@@ -85,6 +86,9 @@ def parse_args(argv=None):
     parser.add_argument("--overlay-style", default=None,
                         choices=["cream", "glass", "hud", "aurora"],
                         help="Recording-pill look. Default: last used, else glass.")
+    parser.add_argument("--ai-cleanup", action="store_true",
+                        help="Turn on the on-device AI cleanup step (Apple Intelligence, "
+                        "macOS 26+) for this run. Also in the menu under Smart formatting.")
     parser.add_argument(
         "--self-test", action="store_true",
         help="Load the model, run one inference through the engine, then exit 0. "
@@ -144,6 +148,8 @@ def build_settings(args, saved):
         s["waveform"] = False
     if args.overlay_style:
         s["overlay_style"] = args.overlay_style
+    if args.ai_cleanup:
+        s["ai_cleanup"] = True
     s["device"] = normalize_device_spec(s["device"])
     return s
 
@@ -170,6 +176,10 @@ def main(argv=None):
         t.transcribe(np.zeros(16000, dtype=np.float32), language="en")
         from . import perms
         print("[self-test] permissions:", perms.summary())
+        from . import aicleanup
+        ai = aicleanup.AICleanup()
+        print(f"[self-test] AI cleanup helper: {ai.path or 'missing'}; "
+              f"available: {ai.availability()}")
         print("SELF-TEST OK")
         return
 

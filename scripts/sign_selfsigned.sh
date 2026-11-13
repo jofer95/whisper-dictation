@@ -49,6 +49,12 @@ EOF
 fi
 
 echo "Signing $APP ..."
+# --deep doesn't descend into Resources: sign the Swift helper explicitly, BEFORE
+# the bundle (signing it afterwards would break the app's resource seal).
+HELPER="$APP/Contents/Resources/aicleanup"
+if [ -f "$HELPER" ]; then
+  codesign --force -s "$CERT_CN" "$HELPER"
+fi
 codesign --deep --force -s "$CERT_CN" "$APP"
 codesign --verify --deep --strict "$APP" && echo "signature verifies ✅"
 codesign -dvv "$APP" 2>&1 | grep -iE "Authority=|Identifier=" || true
