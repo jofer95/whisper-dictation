@@ -9,7 +9,7 @@ Slack, Notes, an email, this very README. No cloud. No subscription. No catch.
 
 ![macOS](https://img.shields.io/badge/macOS-11%2B-black?logo=apple&logoColor=white)
 ![Apple Silicon + Intel](https://img.shields.io/badge/Apple%20Silicon%20%2B%20Intel-supported-success)
-![Python](https://img.shields.io/badge/Python-3.10%2B-blue?logo=python&logoColor=white)
+![Python](https://img.shields.io/badge/Python-3.12%2B-blue?logo=python&logoColor=white)
 ![100% Offline](https://img.shields.io/badge/100%25-offline-brightgreen)
 ![No Telemetry](https://img.shields.io/badge/telemetry-none-critical)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
@@ -108,10 +108,15 @@ first launch. After that, pull the Wi-Fi plug and it keeps working forever.
 
 ---
 
-## 📦 Install (build from source)
+## 📦 Install
 
-**Requirements:** macOS 11+ (Apple Silicon or Intel), Python 3.10+, and `ffmpeg`
-(`brew install ffmpeg`).
+> **Teammates:** a signed, notarized `.dmg` (double-click → drag to
+> Applications) is on the way — it's waiting on the Apple Developer ID, see
+> [DISTRIBUTION.md](DISTRIBUTION.md). Until then, build it yourself (5 minutes):
+
+**Requirements:** macOS 11+ (Apple Silicon or Intel), Python **3.12+**
+(`brew install python@3.13`), and Xcode Command Line Tools (`xcode-select --install`).
+No ffmpeg / Homebrew audio libraries needed — they're bundled.
 
 ```bash
 git clone https://github.com/jofer95/whisper-dictation-hcp.git
@@ -124,14 +129,33 @@ cp -R "dist/Whisper Dictation.app" /Applications/
 open "/Applications/Whisper Dictation.app"
 ```
 
-Prefer to run from source without packaging? Just `./run.sh`.
+The first launch downloads the speech model (~460 MB, once); after that it's
+fully offline. `scripts/build.sh` asks for your login password **once** to
+create a local signing identity, so macOS keeps your permissions across rebuilds.
+
+### 🔄 Update
+
+```bash
+cd whisper-dictation-hcp && git pull
+source .venv/bin/activate && pip install -r requirements.txt
+./scripts/build.sh
+osascript -e 'quit app "Whisper Dictation"'
+rm -rf "/Applications/Whisper Dictation.app" && cp -R "dist/Whisper Dictation.app" /Applications/
+open "/Applications/Whisper Dictation.app"
+```
+
+Your settings, dictionary, history and permissions are kept.
+
+Prefer to run from source without packaging? `./run.sh` (then grant
+Accessibility to your terminal app instead).
 
 ### 🔑 One-time permissions (macOS)
 
 Grant the app, under **System Settings → Privacy & Security**:
 
-- **Accessibility** — to register the global shortcut and paste text.
-- **Microphone** — to hear you (prompted on first recording).
+- **Accessibility** — for the global shortcut, pasting, and reading the text
+  around the cursor (context awareness).
+- **Microphone** — to hear you (prompted on first launch).
 
 The menu's **"Grant / re-check permissions…"** item opens the right pane for you.
 
@@ -192,7 +216,19 @@ open "dist/Whisper Dictation.app" --args --simulate clip.wav
 - `scripts/sign_selfsigned.sh` — creates a stable signing identity so macOS keeps
   your permission grants across rebuilds. For company-wide (MDM) distribution,
   swap it for a Developer ID / org certificate + notarization.
+- `scripts/release.sh` — Developer ID signing + notarization + `.dmg`
+  ([DISTRIBUTION.md](DISTRIBUTION.md)); `SIGN_ONLY=1` dry-runs it with a local cert.
 - `QA_CHECKLIST.md` — run before each release.
+
+### 🗂️ Where things live
+
+| What | Where |
+|---|---|
+| Settings | `~/Library/Application Support/whisper-dictation-hcp/prefs.json` |
+| Dictionary & snippets | `…/whisper-dictation-hcp/dictionary.json` (menu → *Dictionary & snippets…*) |
+| History (optional) / stats | `…/whisper-dictation-hcp/history.jsonl`, `stats.json` |
+| Log | `~/Library/Logs/whisper-dictation-hcp.log` (menu → *Open log*) |
+| Speech models | `~/.cache/huggingface/hub/` |
 
 ---
 
@@ -200,6 +236,8 @@ open "dist/Whisper Dictation.app" --args --simulate clip.wav
 
 - **Fn (🌐) shortcut:** macOS must be set to *System Settings → Keyboard → “Press 🌐 key to” → Do Nothing*, otherwise the emoji picker / input switcher fires too. The app detects this and tells you.
 - **Context awareness is limited in some apps** (Slack, Teams, many Electron apps don't expose the text around the cursor). Dictation still works; spacing/capitals just aren't adjusted.
+- **A word keeps coming out wrong?** (e.g. "README" heard as "RitMe") — add it to
+  *words* and the misheard form to *corrections* in **Dictionary & snippets…**.
 - **Cleanup is rule-based, not an LLM** (Wispr uses a cloud model). It only fires on explicit cues (“scratch that”, “2, no, 3”) so it never rewrites what you meant.
 
 ## 🙏 Credits & license

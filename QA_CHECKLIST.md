@@ -57,7 +57,7 @@ Legend: ⌘⌥ = default toggle. "Status" = the menu's `Status:` line.
 ## 8. Edge cases
 - [ ] Recording pure silence → Status `no speech detected` (no garbage inserted).
 - [ ] Recording with the wrong/no mic → Status `no audio — check mic & mic permission`.
-- [ ] Long recording auto-stops at `--max-time` (default 60 s).
+- [ ] Long recording warns at 19 min and auto-stops + transcribes at `--max-time` (default 20 min).
 - [ ] Rapid start/stop doesn't crash or wedge the app.
 - [ ] Quit fully stops the app (no lingering process: `pgrep -f "Whisper Dictation"`).
 
