@@ -23,7 +23,9 @@ def get_logger():
 
     try:
         os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
-        fh = logging.FileHandler(LOG_PATH)
+        # Explicit UTF-8: a GUI .app has no LANG, so the default encoding is
+        # ASCII and every line with an accent or emoji was silently dropped.
+        fh = logging.FileHandler(LOG_PATH, encoding="utf-8")
         fh.setFormatter(fmt)
         logger.addHandler(fh)
     except Exception:

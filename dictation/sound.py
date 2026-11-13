@@ -45,13 +45,18 @@ def get_output_muted():
             ["osascript", "-e", "output muted of (get volume settings)"],
             capture_output=True, text=True, timeout=3,
         )
-        return result.stdout.strip() == "true"
+        out = result.stdout.strip()
+        return {"true": True, "false": False}.get(out)  # "missing value" -> None
     except Exception:
         log.exception("could not read output mute state")
         return None
 
 
-def set_output_muted(muted: bool):
+def set_output_muted(muted):
+    """Set output mute. None (state unknown) is a no-op, so we never un-mute
+    audio the user had muted themselves just because we couldn't read it."""
+    if muted is None:
+        return
     try:
         value = "true" if muted else "false"
         subprocess.run(

@@ -64,3 +64,23 @@ Legend: ⌘⌥ = default toggle. "Status" = the menu's `Status:` line.
 ## 9. Privacy (spot check)
 - [ ] After first-run model download, disconnect Wi-Fi → dictation still works fully offline.
 - [ ] No unexpected network connections during dictation (e.g., verify with Little Snitch / `nettop`).
+
+## v1.13 — Wispr-style flow
+
+- [ ] Smart mode: hold shortcut ≥1 s, speak, release → text inserted.
+- [ ] Smart mode: quick single tap → pill appears then disappears, nothing typed.
+- [ ] Smart mode: double-tap → hands-free (keeps recording after release); tap again → inserted.
+- [ ] Esc while recording → "Cancelled", nothing typed, Esc not delivered to the app.
+- [ ] ⌘⌥ + Esc (with ⌘⌥ shortcut) → Force Quit opens, recording silently cancelled.
+- [ ] ⌥+Space toggle → no non-breaking space typed into the document.
+- [ ] ⌃⌘V → pastes the last transcript.
+- [ ] Say "… scratch that …" / "nueva línea" / "a las 2, no, a las 3" → cleaned output.
+- [ ] Dictionary: add a word, save, dictate it → exact spelling, no restart.
+- [ ] Copy an image, dictate, ⌘V → the image is still on the clipboard.
+- [ ] Dictate into a password field → not pasted, "copied instead" message.
+- [ ] Click the desktop (no text field), dictate → "No text field — copied" message, ⌘V works.
+- [ ] Plug in AirPods while the app runs → they appear under Microphone.
+- [ ] Select a silent/virtual mic → "No sound from …" warning after ~2.5 s.
+- [ ] Two monitors: pill appears above the Dock on the screen with the mouse.
+- [ ] `python -m unittest discover -s tests` passes.
+

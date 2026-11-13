@@ -11,16 +11,27 @@ WisperFlow's pill). Four selectable styles:
 
 A live level history scrolls across the bars (flat = no audio, moving = capture
 works). When recording stops the pill flips to a spinner while transcribing,
-then hides.
+then hides. It can also widen into a short message ("Cancelled", "No text
+field — copied, press ⌘V", "Mic is silent").
 
-Everything visual runs on the main thread; finish() is the one call that may
-come from the transcription worker, so it hops to the main thread first.
+Like Wispr's Flow Bar it sits just above the Dock on the display your mouse is
+on (it used to sit on top of the Dock, always on the "main" screen).
+
+Everything visual runs on the main thread; finish() and message() may be called
+from the worker, so they hop to the main thread. A generation counter makes a
+late finish() from the previous dictation unable to hide a new recording's pill.
 """
 
 import math
 
 import objc
 from AppKit import (
+    NSAttributedString,
+    NSEvent,
+    NSFont,
+    NSFontAttributeName,
+    NSForegroundColorAttributeName,
+    NSMouseInRect,
     NSAppearance,
     NSAppearanceNameVibrantDark,
     NSBackingStoreBuffered,
@@ -45,6 +56,8 @@ from AppKit import (
     NSWindowStyleMaskNonactivatingPanel,
 )
 
+from PyObjCTools import AppHelper
+
 from .log import get_logger
 
 log = get_logger()
@@ -54,7 +67,9 @@ BARS = 9
 BAR_W, GAP = 3.0, 3.0
 FPS = 30.0
 GAIN = 6.0            # speech peaks ~0.05–0.4; scale so talking nearly fills the pill
-BOTTOM_MARGIN = 24.0  # px above the screen bottom
+BOTTOM_MARGIN = 14.0  # px above the Dock / bottom of the usable screen area
+MSG_MAX_W = 460.0
+_AUTORESIZE = 2 | 16  # NSViewWidthSizable | NSViewHeightSizable
 VOICE_ON = 0.03       # peak above which we treat the stream as catching your voice
 
 STYLES = ("cream", "glass", "hud", "aurora")
@@ -88,12 +103,14 @@ class _WaveView(NSView):
         self._mode = "wave"
         self._spin = 0.0
         self._style = DEFAULT_STYLE
+        self._message = None
         return self
 
     def startAnimating(self):
         self._levels = [0.0] * BARS
         self._active = False
         self._mode = "wave"
+        self._message = None
         if self._timer is None:
             self._timer = (
                 NSTimer.scheduledTimerWithTimeInterval_target_selector_userInfo_repeats_(
@@ -110,11 +127,10 @@ class _WaveView(NSView):
             self._timer.invalidate()
             self._timer = None
 
-    def finishOnMain(self):
-        self.stopAnimating()
-        window = self.window()
-        if window is not None:
-            window.orderOut_(None)
+    def setMessage_(self, text):
+        self._mode = "message"
+        self._message = text
+        self.setNeedsDisplay_(True)
 
     def tick_(self, _timer):
         if self._mode == "loading":
@@ -133,6 +149,13 @@ class _WaveView(NSView):
         self.setNeedsDisplay_(True)
 
     # ---- style-aware colors ----
+    def _text_color(self):
+        if self._style == "cream":
+            return _INK
+        if self._style == "glass":
+            return NSColor.labelColor()
+        return _WHITE
+
     def _spinner_color(self):
         if self._style == "cream":
             return _INK
@@ -163,9 +186,13 @@ class _WaveView(NSView):
         if self._mode == "loading":
             self._draw_spinner()
             return
+        if self._mode == "message":
+            self._draw_message()
+            return
 
+        width = self.bounds().size.width
         span = BARS * BAR_W + (BARS - 1) * GAP
-        x = (PANEL_W - span) / 2.0
+        x = (width - span) / 2.0
         mid = PANEL_H / 2.0
         max_h = PANEL_H - 12.0
         for level in self._levels:
@@ -177,8 +204,15 @@ class _WaveView(NSView):
             self._fill_bar(path)
             x += BAR_W + GAP
 
+    def _draw_message(self):
+        text = message_string(self._message or "", self._text_color())
+        size = text.size()
+        width = self.bounds().size.width
+        text.drawAtPoint_(((width - size.width) / 2.0, (PANEL_H - size.height) / 2.0))
+
     def _draw_cream_shell(self):
-        pill = NSMakeRect(1.5, 1.5, PANEL_W - 3, PANEL_H - 3)
+        width = self.bounds().size.width
+        pill = NSMakeRect(1.5, 1.5, width - 3, PANEL_H - 3)
         radius = (PANEL_H - 3) / 2.0
         path = NSBezierPath.bezierPathWithRoundedRect_xRadius_yRadius_(pill, radius, radius)
         _CREAM.setFill()
@@ -189,7 +223,7 @@ class _WaveView(NSView):
 
     def _draw_spinner(self):
         r = PANEL_H / 2.0 - 9.0
-        center = (PANEL_W / 2.0, PANEL_H / 2.0)
+        center = (self.bounds().size.width / 2.0, PANEL_H / 2.0)
         arc = NSBezierPath.bezierPath()
         arc.setLineWidth_(2.5)
         arc.setLineCapStyle_(1)
@@ -197,6 +231,23 @@ class _WaveView(NSView):
             center, r, self._spin, self._spin + 270.0)
         self._spinner_color().setStroke()
         arc.stroke()
+
+
+def message_string(text, color):
+    attrs = {
+        NSFontAttributeName: NSFont.systemFontOfSize_weight_(12.5, 0.3),
+        NSForegroundColorAttributeName: color,
+    }
+    return NSAttributedString.alloc().initWithString_attributes_(text, attrs)
+
+
+def _on_main(fn):
+    """Run fn on the main thread (now if we're already on it)."""
+    from Foundation import NSThread
+    if NSThread.isMainThread():
+        fn()
+    else:
+        AppHelper.callAfter(fn)
 
 
 class WaveformOverlay:
@@ -207,6 +258,7 @@ class WaveformOverlay:
         self._style = style if style in STYLES else DEFAULT_STYLE
         self._panel = None
         self._view = None
+        self._gen = 0
 
     def set_style(self, style):
         """Switch the look. Rebuilds the panel on next show()."""
@@ -243,6 +295,7 @@ class WaveformOverlay:
         view = _WaveView.alloc().initWithFrame_(rect)
         view._level_fn = self._level_fn
         view._style = self._style
+        view.setAutoresizingMask_(_AUTORESIZE)
 
         if self._style == "cream":
             panel.setContentView_(view)
@@ -259,6 +312,7 @@ class WaveformOverlay:
         material = (NSVisualEffectMaterialHUDWindow if self._style == "hud"
                     else NSVisualEffectMaterialPopover)
         effect = NSVisualEffectView.alloc().initWithFrame_(rect)
+        effect.setAutoresizingMask_(_AUTORESIZE)
         effect.setMaterial_(material)
         effect.setBlendingMode_(NSVisualEffectBlendingModeBehindWindow)
         effect.setState_(NSVisualEffectStateActive)
@@ -281,6 +335,7 @@ class WaveformOverlay:
         try:
             from Quartz import CAGradientLayer, CABasicAnimation
             aurora = NSView.alloc().initWithFrame_(rect)
+            aurora.setAutoresizingMask_(_AUTORESIZE)
             aurora.setWantsLayer_(True)
             grad = CAGradientLayer.layer()
             grad.setType_("conic")
@@ -309,22 +364,32 @@ class WaveformOverlay:
         except Exception:
             log.exception("aurora sheen unavailable; using plain glass")
 
-    def _center_bottom(self):
-        screen = NSScreen.mainScreen()
+    def _target_screen(self):
+        mouse = NSEvent.mouseLocation()
+        for screen in NSScreen.screens() or []:
+            if NSMouseInRect(mouse, screen.frame(), False):
+                return screen
+        return NSScreen.mainScreen()
+
+    def _place(self, width):
+        screen = self._target_screen()
         if screen is None:
             return
-        vf = screen.frame()
-        x = vf.origin.x + (vf.size.width - PANEL_W) / 2.0
+        vf = screen.visibleFrame()   # excludes the Dock and the menu bar
+        x = vf.origin.x + (vf.size.width - width) / 2.0
         y = vf.origin.y + BOTTOM_MARGIN
-        self._panel.setFrameOrigin_((x, y))
+        self._panel.setFrame_display_(NSMakeRect(x, y, width, PANEL_H), True)
 
+    # ---- public API ----
     def show(self):
+        """Recording started: waveform pill (main thread)."""
         try:
+            self._gen += 1
             if self._panel is None:
                 self._build()
-            self._center_bottom()
-            self._panel.orderFrontRegardless()
+            self._place(PANEL_W)
             self._view.startAnimating()
+            self._panel.orderFrontRegardless()
         except Exception:
             log.exception("could not show waveform overlay")
 
@@ -336,12 +401,45 @@ class WaveformOverlay:
             log.exception("could not switch overlay to loading")
 
     def finish(self):
-        try:
-            if self._view is not None:
-                self._view.performSelectorOnMainThread_withObject_waitUntilDone_(
-                    b"finishOnMain", None, False)
-        except Exception:
-            log.exception("could not finish waveform overlay")
+        """Transcription done: hide — unless a newer recording already took the
+        pill over (any thread)."""
+        gen = self._gen
+        _on_main(lambda: self._hide_if(gen))
+
+    def message(self, text, seconds=2.4, resume_wave=False):
+        """Widen the pill into a short message (any thread). With resume_wave
+        the waveform comes back afterwards (used mid-recording)."""
+        def show_msg():
+            try:
+                if self._panel is None:
+                    self._build()
+                self._gen += 1
+                gen = self._gen
+                color = self._view._text_color()
+                width = min(MSG_MAX_W, max(PANEL_W, message_string(text, color).size().width + 32))
+                self._view.stopAnimating()
+                self._view.setMessage_(text)
+                self._place(width)
+                self._panel.orderFrontRegardless()
+                AppHelper.callLater(seconds, lambda: self._after_message(gen, resume_wave))
+            except Exception:
+                log.exception("could not show overlay message")
+        _on_main(show_msg)
+
+    def _after_message(self, gen, resume_wave):
+        if gen != self._gen:
+            return
+        if resume_wave:
+            self._place(PANEL_W)
+            self._view.startAnimating()
+            self._view._mode = "wave"
+            self._view.setNeedsDisplay_(True)
+        else:
+            self._hide_if(gen)
+
+    def _hide_if(self, gen):
+        if gen == self._gen:
+            self.hide()
 
     def hide(self):
         try:
