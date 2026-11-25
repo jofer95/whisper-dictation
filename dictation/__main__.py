@@ -162,7 +162,7 @@ def load_transcriber(name):
 
 def main(argv=None):
     args = parse_args(argv)
-    log.info(f"starting whisper-dictation-hcp v{__version__}; log at {LOG_PATH}")
+    log.info(f"starting whisper-dictation v{__version__}; log at {LOG_PATH}")
 
     settings = build_settings(args, prefs.load())
     log.info(f"settings: {settings}")

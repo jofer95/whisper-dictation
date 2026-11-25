@@ -10,4 +10,4 @@ A hardened fork of foges/whisper-dictation:
   * No cloud SDK, no network calls, no telemetry. 100% local.
 """
 
-__version__ = "1.13.0"
+__version__ = "1.14.0"

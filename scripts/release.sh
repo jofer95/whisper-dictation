@@ -4,7 +4,7 @@
 # warnings. Replaces the local self-signed flow (scripts/build.sh) for releases.
 #
 # Needs (see DISTRIBUTION.md for how to get them — Admin role required):
-#   export DEV_ID="Developer ID Application: Your Company Inc. (TEAMID1234)"
+#   export DEV_ID="Developer ID Application: Your Name or Company (TEAMID1234)"
 #   export NOTARY_PROFILE="whisper-notary"   # saved once with:
 #     xcrun notarytool store-credentials whisper-notary \
 #       --key ~/keys/AuthKey_XXXXXXXXXX.p8 --key-id XXXXXXXXXX --issuer <issuer-uuid>

@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Whisper Dictation — private, offline dictation for macOS</title>
+<meta name="description" content="Hold a shortcut, talk, and your words appear wherever your cursor is. A free, open-source, fully offline alternative to Wispr Flow for macOS, built on Whisper.">
+<meta property="og:title" content="Whisper Dictation">
+<meta property="og:description" content="Private, offline voice dictation for macOS. Hold to talk, release to type — in any app.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎙️</text></svg>">
+<style>
+  :root {
+    --bg: #fbfaf7; --bg-alt: #f2efe8; --card: #ffffff; --ink: #1c1b19; --muted: #5d5a53;
+    --line: #e3ded3; --accent: #5b5bd6; --accent-2: #9a5bd6; --accent-soft: #ecebfb;
+    --code-bg: #f4f2ec; --ok: #1f8a4c; --warn: #b4641a;
+    --radius: 14px; --maxw: 1080px;
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121214; --bg-alt: #18181c; --card: #1d1d22; --ink: #ecebe8; --muted: #a3a09a;
+      --line: #2d2d34; --accent: #8f8fff; --accent-2: #c08cff; --accent-soft: #24243a;
+      --code-bg: #1a1a1f; --ok: #4cc683; --warn: #e0a05a;
+      color-scheme: dark;
+    }
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 16px/1.6 -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", Inter, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code, pre, kbd { font-family: ui-monospace, "SF Mono", Menlo, Consolas, monospace; font-size: .9em; }
+  code { background: var(--code-bg); padding: .12em .4em; border-radius: 6px; }
+  kbd {
+    display: inline-block; min-width: 1.7em; text-align: center; padding: .1em .45em;
+    border: 1px solid var(--line); border-bottom-width: 2px; border-radius: 6px;
+    background: var(--card); font-size: .85em;
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--line); border-radius: var(--radius);
+    padding: 16px 18px; overflow-x: auto; line-height: 1.5; margin: 0;
+  }
+  pre code { background: none; padding: 0; }
+  .wrap { max-width: var(--maxw); margin: 0 auto; padding: 0 16px; }
+
+  /* nav */
+  nav.top {
+    position: sticky; top: 0; z-index: 10; backdrop-filter: saturate(160%) blur(12px);
+    -webkit-backdrop-filter: saturate(160%) blur(12px);
+    background: color-mix(in srgb, var(--bg) 82%, transparent); border-bottom: 1px solid var(--line);
+  }
+  nav.top .wrap { display: flex; align-items: center; gap: 20px; height: 56px; }
+  nav.top .brand { font-weight: 700; color: var(--ink); white-space: nowrap; }
+  nav.top .links { display: flex; gap: 18px; overflow-x: auto; scrollbar-width: none; }
+  nav.top .links a { color: var(--muted); font-size: 14px; white-space: nowrap; }
+  nav.top .links a:hover { color: var(--ink); text-decoration: none; }
+  nav.top .gh { margin-left: auto; white-space: nowrap; font-size: 14px; font-weight: 600; }
+  @media (max-width: 640px) { nav.top .links { display: none; } }
+
+  /* hero */
+  header.hero { padding: 72px 0 48px; text-align: center; }
+  .pill-demo {
+    display: inline-flex; align-items: center; gap: 4px; height: 36px; padding: 0 16px;
+    border-radius: 999px; background: #1d1d22; box-shadow: 0 8px 30px rgba(0,0,0,.18); margin-bottom: 28px;
+  }
+  .pill-demo i {
+    display: block; width: 3px; border-radius: 2px; background: #fff;
+    animation: bar 1.1s ease-in-out infinite;
+  }
+  .pill-demo i:nth-child(2){animation-delay:.1s}.pill-demo i:nth-child(3){animation-delay:.2s}
+  .pill-demo i:nth-child(4){animation-delay:.3s}.pill-demo i:nth-child(5){animation-delay:.4s}
+  .pill-demo i:nth-child(6){animation-delay:.5s}.pill-demo i:nth-child(7){animation-delay:.6s}
+  @keyframes bar { 0%,100% { height: 4px; opacity: .55 } 50% { height: 18px; opacity: 1 } }
+  @media (prefers-reduced-motion: reduce) { .pill-demo i { animation: none; height: 10px; } }
+  h1 { font-size: clamp(34px, 6vw, 56px); line-height: 1.08; letter-spacing: -.02em; margin: 0 0 16px; }
+  h1 span {
+    background: linear-gradient(90deg, var(--accent), var(--accent-2));
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+  .lede { font-size: clamp(17px, 2.2vw, 20px); color: var(--muted); max-width: 680px; margin: 0 auto 28px; }
+  .cta { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 8px; padding: 11px 20px; border-radius: 999px;
+    font-weight: 600; font-size: 15px; border: 1px solid var(--line); color: var(--ink); background: var(--card);
+  }
+  .btn.primary { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+  .btn:hover { text-decoration: none; transform: translateY(-1px); }
+  .badges { display: flex; gap: 8px; justify-content: center; flex-wrap: wrap; margin-top: 26px; }
+  .badge { font-size: 13px; color: var(--muted); border: 1px solid var(--line); border-radius: 999px; padding: 3px 12px; background: var(--card); }
+
+  /* sections */
+  section { padding: 56px 0; border-top: 1px solid var(--line); }
+  section.alt { background: var(--bg-alt); }
+  h2 { font-size: clamp(26px, 3.4vw, 34px); letter-spacing: -.01em; margin: 0 0 10px; }
+  h3 { font-size: 18px; margin: 0 0 6px; }
+  .sub { color: var(--muted); margin: 0 0 28px; max-width: 720px; }
+  .grid { display: grid; gap: 16px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 20px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .card .ico { font-size: 22px; margin-bottom: 8px; display: block; }
+
+  /* pipeline */
+  .pipeline { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; align-items: stretch; }
+  .step { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; position: relative; }
+  .step b { display: block; font-size: 15px; margin-bottom: 4px; }
+  .step span { color: var(--muted); font-size: 13.5px; line-height: 1.45; display: block; }
+  .step .n { font-size: 12px; font-weight: 700; color: var(--accent); letter-spacing: .06em; text-transform: uppercase; margin-bottom: 6px; }
+  @media (max-width: 860px) { .pipeline { grid-template-columns: 1fr; } }
+
+  .example { display: grid; grid-template-columns: 1fr auto 1fr; gap: 14px; align-items: center; margin-top: 18px; }
+  .example .said, .example .typed { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; font-size: 15px; }
+  .example .label { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin-bottom: 4px; }
+  .example .arrow { color: var(--accent); font-size: 22px; }
+  .example s { color: var(--muted); }
+  @media (max-width: 700px) { .example { grid-template-columns: 1fr; } .example .arrow { transform: rotate(90deg); justify-self: center; } }
+
+  /* tables */
+  .table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: var(--radius); background: var(--card); }
+  table { border-collapse: collapse; width: 100%; font-size: 15px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { font-size: 13px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); background: var(--bg-alt); }
+  tr:last-child td { border-bottom: none; }
+  td.yes { color: var(--ok); font-weight: 600; }
+  td.no { color: var(--warn); }
+
+  .two { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 860px) { .two { grid-template-columns: 1fr; } }
+  ol.steps { padding-left: 20px; margin: 0; } ol.steps li { margin-bottom: 8px; }
+  .note { border-left: 3px solid var(--accent); background: var(--accent-soft); padding: 12px 16px; border-radius: 0 10px 10px 0; font-size: 15px; margin: 16px 0 0; }
+
+  /* architecture */
+  .mods { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); }
+  .mod { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; }
+  .mod code { font-weight: 700; background: none; padding: 0; color: var(--accent); }
+  .mod p { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+
+  details { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; margin-bottom: 10px; }
+  details summary { cursor: pointer; font-weight: 600; }
+  details p { color: var(--muted); margin: 10px 0 0; }
+
+  footer { padding: 40px 0 56px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+  footer .wrap { display: flex; flex-wrap: wrap; gap: 12px 24px; justify-content: space-between; }
+</style>
+</head>
+<body>
+
+<nav class="top">
+  <div class="wrap">
+    <span class="brand">🎙️ Whisper Dictation</span>
+    <div class="links">
+      <a href="#how">How it works</a>
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="#use">Using it</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#architecture">Architecture</a>
+      <a href="#faq">FAQ</a>
+    </div>
+    <a class="gh" href="https://github.com/jofer95/whisper-dictation">GitHub →</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="wrap">
+    <div class="pill-demo" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    <h1>Your voice → text,<br><span>anywhere on your Mac.</span></h1>
+    <p class="lede">Hold a shortcut, talk, let go — your words appear wherever your cursor is.
+      A free, open-source alternative to Wispr Flow that runs <strong>entirely on your Mac</strong>:
+      no cloud, no account, no subscription.</p>
+    <div class="cta">
+      <a class="btn primary" href="#install">Install in 5 minutes</a>
+      <a class="btn" href="https://github.com/jofer95/whisper-dictation">View the code</a>
+    </div>
+    <div class="badges">
+      <span class="badge">macOS 11+</span><span class="badge">Apple Silicon &amp; Intel</span>
+      <span class="badge">100% offline</span><span class="badge">No telemetry</span>
+      <span class="badge">English · Español · mixed</span><span class="badge">MIT license</span>
+    </div>
+  </div>
+</header>
+
+<section id="how" class="alt">
+  <div class="wrap">
+    <h2>How it works</h2>
+    <p class="sub">A menu-bar app (🎙️) listens for your shortcut. Everything below happens locally,
+      in about a second for a short phrase on Apple Silicon.</p>
+    <div class="pipeline">
+      <div class="step"><div class="n">1 · Listen</div><b>Hold the shortcut</b>
+        <span>A glass pill appears above the Dock and the bars move with your voice. Double-tap for hands-free.</span></div>
+      <div class="step"><div class="n">2 · Transcribe</div><b>Whisper, on-device</b>
+        <span>Voice detection trims silence; <a href="https://github.com/SYSTRAN/faster-whisper">faster-whisper</a> detects Spanish or English and transcribes. It never translates.</span></div>
+      <div class="step"><div class="n">3 · Clean up</div><b>Offline rules</b>
+        <span>Drops “um / eh”, honors “scratch that”, “new line”, “2, no, 3”, and applies your dictionary &amp; snippets.</span></div>
+      <div class="step"><div class="n">4 · Fit in</div><b>Reads the cursor</b>
+        <span>Adds the right space and capital, drops a mid-line period, skips password fields.</span></div>
+      <div class="step"><div class="n">5 · Insert</div><b>Pastes at the cursor</b>
+        <span>Accents land perfectly, and your clipboard (images, files, rich text) is put back afterwards.</span></div>
+    </div>
+    <div class="example">
+      <div class="said"><span class="label">You say</span>“Um, the meeting is tomorrow at 2, no, at 3. New line. Please confirm.”</div>
+      <div class="arrow" aria-hidden="true">→</div>
+      <div class="typed"><span class="label">It types</span>The meeting is tomorrow at 3.<br>Please confirm.</div>
+    </div>
+  </div>
+</section>
+
+<section id="features">
+  <div class="wrap">
+    <h2>Features</h2>
+    <p class="sub">The Wispr Flow experience, rebuilt to work offline.</p>
+    <div class="grid">
+      <div class="card"><span class="ico">🎙️</span><h3>Smart shortcut</h3>
+        <p>Hold to talk, double-tap for hands-free, and a lone accidental tap is ignored. Toggle and hold-only modes too. Works with <kbd>Fn</kbd> 🌐.</p></div>
+      <div class="card"><span class="ico">⎋</span><h3>Cancel &amp; recover</h3>
+        <p><kbd>Esc</kbd> cancels and <kbd>⌃</kbd><kbd>⌘</kbd><kbd>V</kbd> pastes the last transcript again. If the shortcut turns out to be part of another one, the recording is dropped.</p></div>
+      <div class="card"><span class="ico">🧹</span><h3>Offline cleanup</h3>
+        <p>Filler words, stutters, “scratch that / borra eso”, “new line / nueva línea”, “punto y aparte”, and corrections like “at 2, actually 3”.</p></div>
+      <div class="card"><span class="ico">🤖</span><h3>Optional AI cleanup</h3>
+        <p>On macOS 26+ with Apple Intelligence, Apple's on-device model can fix grammar and format spoken lists. Still offline, and it falls back safely if it can't help.</p></div>
+      <div class="card"><span class="ico">📖</span><h3>Dictionary &amp; snippets</h3>
+        <p>Teach it names and jargon, fix words it keeps mishearing, and say a trigger to insert saved text. It reloads as soon as you save — no restart.</p></div>
+      <div class="card"><span class="ico">🧭</span><h3>Context-aware</h3>
+        <p>Reads a few characters around the cursor to match spacing and capitals, and drops the final period in chat apps.</p></div>
+      <div class="card"><span class="ico">🌎</span><h3>Bilingual</h3>
+        <p>Auto-detect limited to the languages you speak (Spanish + English by default), so short phrases don't come out as Portuguese.</p></div>
+      <div class="card"><span class="ico">📋</span><h3>Clipboard-safe</h3>
+        <p>Your copied images, files or rich text survive a dictation, and clipboard managers don't record it.</p></div>
+      <div class="card"><span class="ico">🧾</span><h3>History &amp; stats</h3>
+        <p>Recent dictations in the menu (stored only on your Mac, and you can turn that off), words today and your words per minute.</p></div>
+      <div class="card"><span class="ico">🎚️</span><h3>Any microphone</h3>
+        <p>Picks up mics as you plug them in and warns you if the mic is silent. Optional mute of other audio, sound cues, and sessions up to 20 minutes.</p></div>
+    </div>
+
+    <h3 style="margin-top:40px">Compared with Wispr Flow</h3>
+    <div class="table-wrap" style="margin-top:12px">
+      <table>
+        <thead><tr><th></th><th>Wispr Flow</th><th>Whisper Dictation</th></tr></thead>
+        <tbody>
+          <tr><td>Where your voice goes</td><td class="no">Cloud transcription &amp; cleanup</td><td class="yes">Never leaves your Mac</td></tr>
+          <tr><td>Works offline</td><td class="no">No</td><td class="yes">Yes (after a one-time model download)</td></tr>
+          <tr><td>Price</td><td>Subscription</td><td class="yes">Free, MIT-licensed</td></tr>
+          <tr><td>Hold / double-tap / Esc / paste-last</td><td>Yes</td><td class="yes">Yes</td></tr>
+          <tr><td>Dictionary, snippets, context</td><td>Yes</td><td class="yes">Yes</td></tr>
+          <tr><td>Rewriting &amp; formatting</td><td>Cloud LLM</td><td>Rules, plus optional on-device Apple model</td></tr>
+          <tr><td>Accounts, telemetry</td><td>Account required</td><td class="yes">None</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+
+<section id="install" class="alt">
+  <div class="wrap">
+    <h2>Install</h2>
+    <p class="sub">There is no prebuilt download yet (a notarized <code>.dmg</code> needs an Apple Developer ID).
+      Building it yourself takes about five minutes.</p>
+    <div class="two">
+      <div>
+        <h3>Requirements</h3>
+        <ul>
+          <li>macOS 11+ on Apple Silicon or Intel</li>
+          <li>Python <strong>3.12+</strong> — <code>brew install python@3.13</code></li>
+          <li>Xcode Command Line Tools — <code>xcode-select --install</code></li>
+          <li>~500 MB free for the speech model (downloaded once)</li>
+        </ul>
+        <p class="note">No ffmpeg or Homebrew audio libraries needed — they ship inside the Python wheels.</p>
+      </div>
+      <div>
+        <h3>Build &amp; run</h3>
+<pre><code>git clone https://github.com/jofer95/whisper-dictation.git
+cd whisper-dictation
+python3 -m venv .venv &amp;&amp; source .venv/bin/activate
+pip install -r requirements.txt
+
+./scripts/build.sh
+cp -R "dist/Whisper Dictation.app" /Applications/
+open "/Applications/Whisper Dictation.app"</code></pre>
+      </div>
+    </div>
+    <h3 style="margin-top:32px">First launch</h3>
+    <ol class="steps">
+      <li><code>build.sh</code> asks for your login password <strong>once</strong> to create a local code-signing identity, so macOS remembers your permissions across rebuilds.</li>
+      <li>Grant <strong>Microphone</strong> and <strong>Accessibility</strong> in System Settings → Privacy &amp; Security. The menu item <em>Grant / re-check permissions…</em> opens the right pane.</li>
+      <li>The speech model downloads in the background (the menu shows ⏳). After that, everything works without internet.</li>
+    </ol>
+    <p class="note">Want to ship a signed build to other Macs? <a href="https://github.com/jofer95/whisper-dictation/blob/main/DISTRIBUTION.md">DISTRIBUTION.md</a> walks through the Developer ID certificate, notarization and <code>scripts/release.sh</code>.</p>
+  </div>
+</section>
+
+<section id="use">
+  <div class="wrap">
+    <h2>Using it</h2>
+    <p class="sub">Look for 🎙️ in the menu bar: 🎙️ idle · 🔴 recording · ⏳ transcribing.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Do this</th><th>Get this</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Hold</strong> the shortcut, talk, release</td><td>Text appears at your cursor</td></tr>
+          <tr><td><strong>Double-tap</strong> the shortcut</td><td>Hands-free — tap once more to finish</td></tr>
+          <tr><td><kbd>Esc</kbd> while recording</td><td>Cancel; nothing is typed</td></tr>
+          <tr><td><kbd>⌃</kbd><kbd>⌘</kbd><kbd>V</kbd></td><td>Paste the last transcript again</td></tr>
+          <tr><td>Say “scratch that” / “borra eso”</td><td>Drops the previous sentence</td></tr>
+          <tr><td>Say “new line”, “nueva línea”, “new paragraph”, “punto y aparte”</td><td>Line and paragraph breaks</td></tr>
+          <tr><td>Say “at 2, actually 3” / “a las 2, no, a las 3”</td><td>Keeps only the correction</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="two" style="margin-top:28px">
+      <div>
+        <h3>The menu</h3>
+        <p style="color:var(--muted);margin-top:0">History · Shortcut (<kbd>Fn</kbd>, <kbd>⌃</kbd><kbd>⌥</kbd>, <kbd>⌘</kbd><kbd>⌥</kbd>…) · Mode (Smart, Toggle, Hold) ·
+          Microphone · Language · Speech model (Small, or Large v3 Turbo for maximum accuracy) ·
+          Smart formatting switches · Dictionary &amp; snippets · Sounds · Mute other audio · Pill style · Permissions · Log.</p>
+      </div>
+      <div>
+        <h3>Dictionary &amp; snippets</h3>
+<pre><code>{
+  "words": ["Acme Cloud", "GitHub", "README"],
+  "corrections": {"read me": "README"},
+  "snippets": {"my signature": "Thanks,\nAlex"}
+}</code></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="privacy" class="alt">
+  <div class="wrap">
+    <h2>Privacy</h2>
+    <p class="sub">The only network access is the one-time model download from Hugging Face. After that you can unplug the Wi-Fi.</p>
+    <div class="grid">
+      <div class="card"><span class="ico">🔒</span><h3>Audio stays local</h3><p>Transcription runs on your CPU. Recordings are never written to disk or uploaded.</p></div>
+      <div class="card"><span class="ico">🚫</span><h3>No accounts, no telemetry</h3><p>No analytics or crash reporting, and no network code beyond the model download.</p></div>
+      <div class="card"><span class="ico">👁️</span><h3>Minimal context</h3><p>Context awareness reads only a few characters around the cursor via Accessibility, and nothing is kept after the dictation. Password fields are never touched.</p></div>
+      <div class="card"><span class="ico">🗂️</span><h3>Your data, your Mac</h3><p>Settings, dictionary, optional history and stats live in <code>~/Library/Application Support/whisper-dictation/</code>.</p></div>
+    </div>
+  </div>
+</section>
+
+<section id="architecture">
+  <div class="wrap">
+    <h2>Architecture</h2>
+    <p class="sub">Python + PyObjC, packaged with py2app. One rule keeps it smooth: the main thread (menu, pill, shortcut tap) never blocks;
+      a single serial audio worker opens the mic, transcribes and pastes, in order.</p>
+    <div class="mods">
+      <div class="mod"><code>app.py</code><p>Menu-bar app (rumps), recording state, the serial audio worker.</p></div>
+      <div class="mod"><code>hotkey.py</code><p>Quartz event tap that swallows the combo, plus a pure, unit-tested state machine for hold, double-tap and cancel.</p></div>
+      <div class="mod"><code>recorder.py</code><p>16 kHz mono capture (sounddevice / PortAudio), mics tracked by name and re-scanned live.</p></div>
+      <div class="mod"><code>transcriber.py</code><p>faster-whisper with VAD, restricted language detection that reuses the encoder pass, a hallucination filter and the vocabulary prompt.</p></div>
+      <div class="mod"><code>textproc.py</code><p>Rule-based cleanup: commands, backtrack, fillers, dictionary, snippets, context rules.</p></div>
+      <div class="mod"><code>aicleanup.py</code><p>Optional Apple Foundation Models pass through a Swift helper, with a strict timeout and fallback.</p></div>
+      <div class="mod"><code>context.py</code><p>Accessibility: the focused app, field type, and the text before and after the cursor.</p></div>
+      <div class="mod"><code>injector.py</code><p>Clipboard paste with a full snapshot and restore, a transient pasteboard type, and a raw <kbd>⌘</kbd><kbd>V</kbd> event.</p></div>
+      <div class="mod"><code>overlay.py</code><p>The floating pill: waveform, spinner and short messages, on the screen under the mouse.</p></div>
+      <div class="mod"><code>store.py</code><p>Dictionary (hot reload), history, and stats — all local JSON.</p></div>
+    </div>
+    <h3 style="margin-top:32px">Develop &amp; test</h3>
+<pre><code>python -m unittest discover -s tests          # cleanup rules, shortcut state machine, AI fallback
+python -m dictation --self-test               # the engine boots and runs
+./scripts/build.sh                            # .app with a stable local signature
+open "dist/Whisper Dictation.app" --args --simulate clip.wav   # full pipeline without a mic
+DEV_ID="Whisper Dictation Dev" SIGN_ONLY=1 ./scripts/release.sh  # Hardened Runtime dry run</code></pre>
+  </div>
+</section>
+
+<section id="faq" class="alt">
+  <div class="wrap">
+    <h2>FAQ</h2>
+    <details><summary>Pressing <kbd>Fn</kbd> opens the emoji picker.</summary>
+      <p>Set System Settings → Keyboard → “Press 🌐 key to” → <em>Do Nothing</em>. The app detects this and reminds you.</p></details>
+    <details><summary>A word keeps coming out wrong.</summary>
+      <p>Open Dictionary &amp; snippets… and add the right spelling to <code>words</code>, plus what it heard to <code>corrections</code> (for example <code>"rit me": "README"</code>). It applies from your next dictation.</p></details>
+    <details><summary>Spacing or capitals aren't adjusted in Slack / Teams.</summary>
+      <p>Many Electron apps don't expose the text around the cursor through Accessibility. Dictation still works; only the context tweaks are skipped.</p></details>
+    <details><summary>Nothing gets typed.</summary>
+      <p>Check the Permissions line in the menu (Accessibility and Microphone should both be ✅). If no text field was focused, the text is left on your clipboard and <kbd>⌃</kbd><kbd>⌘</kbd><kbd>V</kbd> pastes it again.</p></details>
+    <details><summary>Can I make it more accurate?</summary>
+      <p>Switch Speech model to Large v3 Turbo (a 1.6 GB download, slower on CPU), and add your names and jargon to the dictionary.</p></details>
+    <details><summary>Does it work on Windows or Linux?</summary>
+      <p>No — it relies on macOS APIs (Accessibility, Quartz event taps, AppKit).</p></details>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>🎙️ Whisper Dictation — MIT License. Built on
+      <a href="https://github.com/openai/whisper">OpenAI Whisper</a>,
+      <a href="https://github.com/SYSTRAN/faster-whisper">faster-whisper</a>, and a fork of
+      <a href="https://github.com/foges/whisper-dictation">foges/whisper-dictation</a>.</span>
+    <a href="https://github.com/jofer95/whisper-dictation">github.com/jofer95/whisper-dictation</a>
+  </div>
+</footer>
+</body>
+</html>

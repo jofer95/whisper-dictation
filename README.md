@@ -14,6 +14,9 @@ Slack, Notes, an email, this very README. No cloud. No subscription. No catch.
 ![No Telemetry](https://img.shields.io/badge/telemetry-none-critical)
 ![License](https://img.shields.io/badge/License-MIT-yellow)
 
+**[📖 Documentation site](https://jofer95.github.io/whisper-dictation/)** ·
+[Install](#-install) · [Using it](#️-using-it) · [For developers](#️-for-developers)
+
 </div>
 
 ---
@@ -52,7 +55,7 @@ projects:
 |---|---|---|
 | Engine | PyTorch + openai-whisper (~2–3 GB) | **faster-whisper** (no PyTorch) |
 | Unused cloud SDK | shipped `openai` (pulled aiohttp) | **removed** |
-| Known dependency CVEs | **125** (in a 2023-era lockfile) | **0** (freshly audited) |
+| Known dependency CVEs | **125** (in a 2023-era lockfile) | **0** at the time of the last audit (pinned in `requirements.txt`) |
 | Global hotkey | pynput (flaky in a packaged app) | **native event tap** (rock solid, swallows the combo) |
 | Microphone | first device it found | **live picker** (great for USB/Continuity mics) |
 | Accents (á é í ñ) | per-character typing (mangled) | **clipboard paste** (perfect) |
@@ -98,7 +101,7 @@ first launch. After that, pull the Wi-Fi plug and it keeps working forever.
 - 🌐 **Fn / Globe key** as the shortcut (the app tells you if macOS needs “Press 🌐 key to → Do Nothing”).
 - 🧹 **Offline cleanup** — removes *um / uh / eh / mmm*, stutters (“the the”), and understands **“scratch that” / “borra eso”**, **“new line” / “nueva línea”**, **“new paragraph” / “punto y aparte”**, and corrections like *“at 2, actually 3”* → *“at 3”*.
 - 🤖 **AI cleanup (optional, off by default)** — on macOS 26+ with Apple Intelligence, an on-device pass with Apple's own model fixes grammar and punctuation, catches self-corrections the rules miss and formats spoken lists. Still 100% offline. It never translates (mixed Spanish/English stays mixed), and if it takes longer than 1.5 s (up to 4 s for long dictations), is unavailable or its answer looks off, you get the rule-based text instead. **🎙️ → Smart formatting → AI cleanup**.
-- 📖 **Dictionary & snippets** — teach it names and jargon (“Acme Cloud”, not “Akmi Cloud”), fix words it keeps mishearing, and say a trigger to insert saved text. Hot-reloads, no restart.
+- 📖 **Dictionary & snippets** — teach it names and jargon (“README”, not “RitMe”), fix words it keeps mishearing, and say a trigger to insert saved text. Hot-reloads, no restart.
 - 🧭 **Context-aware** — reads the few characters around your cursor (Accessibility, nothing stored) to add the right space, lowercase *“And”* mid-sentence, drop the final period mid-line, and skip the final period in chat apps (Slack, Messages, WhatsApp, Teams…). Never pastes into password fields.
 - 🌎 **Español + English** — auto-detect restricted to the languages you speak (no more Portuguese guesses on short clips), never translates.
 - ⚡ **Fast** — ~0.8 s for a short phrase on Apple Silicon (half the previous latency).
@@ -111,17 +114,17 @@ first launch. After that, pull the Wi-Fi plug and it keeps working forever.
 
 ## 📦 Install
 
-> **Teammates:** a signed, notarized `.dmg` (double-click → drag to
-> Applications) is on the way — it's waiting on the Apple Developer ID, see
-> [DISTRIBUTION.md](DISTRIBUTION.md). Until then, build it yourself (5 minutes):
+> **No prebuilt download yet.** A signed, notarized `.dmg` needs an Apple
+> Developer ID ([DISTRIBUTION.md](DISTRIBUTION.md) explains how to cut one).
+> Until then, building it yourself takes about 5 minutes:
 
 **Requirements:** macOS 11+ (Apple Silicon or Intel), Python **3.12+**
 (`brew install python@3.13`), and Xcode Command Line Tools (`xcode-select --install`).
 No ffmpeg / Homebrew audio libraries needed — they're bundled.
 
 ```bash
-git clone https://github.com/jofer95/whisper-dictation-hcp.git
-cd whisper-dictation-hcp
+git clone https://github.com/jofer95/whisper-dictation.git
+cd whisper-dictation
 python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt
 
@@ -137,7 +140,7 @@ create a local signing identity, so macOS keeps your permissions across rebuilds
 ### 🔄 Update
 
 ```bash
-cd whisper-dictation-hcp && git pull
+cd whisper-dictation && git pull
 source .venv/bin/activate && pip install -r requirements.txt
 ./scripts/build.sh
 osascript -e 'quit app "Whisper Dictation"'
@@ -146,6 +149,11 @@ open "/Applications/Whisper Dictation.app"
 ```
 
 Your settings, dictionary, history and permissions are kept.
+
+> **Upgrading from 1.13 or earlier** (the app's name used to end in an
+> extra suffix): delete the old app from Applications. Your settings, dictionary and history move over by themselves,
+> but the app has a new identity, so macOS asks for Microphone and
+> Accessibility once more.
 
 Prefer to run from source without packaging? `./run.sh` (then grant
 Accessibility to your terminal app instead).
@@ -183,15 +191,19 @@ sounds, mute, pill style, permissions and the log.
 ### 📖 Dictionary & snippets
 
 **🎙️ → Dictionary & snippets…** opens a small JSON file
-(`~/Library/Application Support/whisper-dictation-hcp/dictionary.json`):
+(`~/Library/Application Support/whisper-dictation/dictionary.json`):
 
 ```json
 {
-  "words": ["Acme Cloud", "GitHub", "Jira"],
-  "corrections": {"acme cloud": "Acme Cloud"},
-  "snippets": {"my signature": "Thanks,\nJorge"}
+  "words": ["Acme Cloud", "GitHub", "README", "Kubernetes"],
+  "corrections": {"akmi cloud": "Acme Cloud", "read me": "README"},
+  "snippets": {"my signature": "Thanks,\nAlex"}
 }
 ```
+
+*words* are spelled exactly like that and also bias recognition toward them;
+*corrections* map what Whisper hears to what you want; a *snippet* trigger is
+replaced by its text.
 
 Save it and your next dictation uses it.
 
@@ -228,10 +240,10 @@ open "dist/Whisper Dictation.app" --args --simulate clip.wav
 
 | What | Where |
 |---|---|
-| Settings | `~/Library/Application Support/whisper-dictation-hcp/prefs.json` |
-| Dictionary & snippets | `…/whisper-dictation-hcp/dictionary.json` (menu → *Dictionary & snippets…*) |
-| History (optional) / stats | `…/whisper-dictation-hcp/history.jsonl`, `stats.json` |
-| Log | `~/Library/Logs/whisper-dictation-hcp.log` (menu → *Open log*) |
+| Settings | `~/Library/Application Support/whisper-dictation/prefs.json` |
+| Dictionary & snippets | `…/whisper-dictation/dictionary.json` (menu → *Dictionary & snippets…*) |
+| History (optional) / stats | `…/whisper-dictation/history.jsonl`, `stats.json` |
+| Log | `~/Library/Logs/whisper-dictation.log` (menu → *Open log*) |
 | Speech models | `~/.cache/huggingface/hub/` |
 
 ---
@@ -242,7 +254,7 @@ open "dist/Whisper Dictation.app" --args --simulate clip.wav
 - **Context awareness is limited in some apps** (Slack, Teams, many Electron apps don't expose the text around the cursor). Dictation still works; spacing/capitals just aren't adjusted.
 - **A word keeps coming out wrong?** (e.g. "README" heard as "RitMe") — add it to
   *words* and the misheard form to *corrections* in **Dictionary & snippets…**.
-- **Cleanup is rule-based, not an LLM** (Wispr uses a cloud model). It only fires on explicit cues (“scratch that”, “2, no, 3”) so it never rewrites what you meant.
+- **The default cleanup is rule-based** (Wispr uses a cloud model). It only fires on explicit cues (“scratch that”, “2, no, 3”), so it never rewrites what you meant. For fuzzier fixes, turn on **AI cleanup** (macOS 26+ with Apple Intelligence, still on-device).
 
 ## 🙏 Credits & license
 
@@ -252,4 +264,15 @@ Built with deep gratitude on top of:
 - [faster-whisper](https://github.com/SYSTRAN/faster-whisper) — the fast on-device runtime (MIT)
 - [foges/whisper-dictation](https://github.com/foges/whisper-dictation) — the original app we forked (MIT)
 
-Released under the **MIT License**. Made with care for my team. 💚
+## 🤝 Contributing
+
+Issues and pull requests are welcome. Before opening a PR, run the unit tests
+(`python -m unittest discover -s tests`) and the parts of
+[QA_CHECKLIST.md](QA_CHECKLIST.md) your change touches. Please keep the app
+offline: no network calls beyond the one-time model download.
+
+## 📄 License
+
+[MIT](LICENSE). This project started as a fork of
+[foges/whisper-dictation](https://github.com/foges/whisper-dictation)
+(MIT, © 2023 Chris Fougner); its notice is kept in [LICENSE](LICENSE). 💚

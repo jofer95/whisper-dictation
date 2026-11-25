@@ -121,8 +121,8 @@ class Context(unittest.TestCase):
                          "and then we left.")
 
     def test_never_lowercases_proper_nouns(self):
-        self.assertEqual(tp.apply_context("Jorge said hi.", before="Yesterday "),
-                         "Jorge said hi.")
+        self.assertEqual(tp.apply_context("Maria said hi.", before="Yesterday "),
+                         "Maria said hi.")
 
     def test_capitalises_at_start_of_field(self):
         self.assertEqual(tp.apply_context("hola a todos.", before=""), "Hola a todos.")

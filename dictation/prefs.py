@@ -1,6 +1,8 @@
 """Persist user preferences (chosen mic, shortcut, language, mute) between runs.
 
-Stored as JSON at ~/Library/Application Support/whisper-dictation-hcp/prefs.json.
+Stored as JSON at ~/Library/Application Support/whisper-dictation/prefs.json.
+(Builds before 1.14 used a folder named "whisper-dictation-hcp"; it is moved
+over automatically on first launch, so settings, dictionary and history survive.)
 The device is saved by NAME (not index) because indices shift as devices are
 plugged/unplugged; the name is resolved back to an index at startup.
 """
@@ -12,7 +14,20 @@ from .log import get_logger
 
 log = get_logger()
 
-PREFS_DIR = os.path.expanduser("~/Library/Application Support/whisper-dictation-hcp")
+PREFS_DIR = os.path.expanduser("~/Library/Application Support/whisper-dictation")
+_LEGACY_DIR = os.path.expanduser("~/Library/Application Support/whisper-dictation-hcp")
+
+
+def _migrate_legacy_dir():
+    try:
+        if not os.path.exists(PREFS_DIR) and os.path.isdir(_LEGACY_DIR):
+            os.rename(_LEGACY_DIR, PREFS_DIR)
+            log.info(f"moved settings from {_LEGACY_DIR} to {PREFS_DIR}")
+    except Exception:
+        log.exception("could not migrate the legacy settings folder")
+
+
+_migrate_legacy_dir()
 PREFS_PATH = os.path.join(PREFS_DIR, "prefs.json")
 
 

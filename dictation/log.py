@@ -1,13 +1,13 @@
 """Lightweight file logger so the packaged .app is debuggable.
 
 GUI apps have no console, so we tee everything to a log file the user can share:
-    ~/Library/Logs/whisper-dictation-hcp.log
+    ~/Library/Logs/whisper-dictation.log
 """
 
 import logging
 import os
 
-LOG_PATH = os.path.expanduser("~/Library/Logs/whisper-dictation-hcp.log")
+LOG_PATH = os.path.expanduser("~/Library/Logs/whisper-dictation.log")
 
 _logger = None
 

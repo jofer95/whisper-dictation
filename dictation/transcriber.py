@@ -62,7 +62,7 @@ _HALLUCINATION_PHRASES = {
 
 
 # Personal-dictionary biasing. Measured on `small`: a bare glossary or the
-# `hotwords` option barely moves it ("Akmi Cloud"), but a short natural sentence
+# `hotwords` option barely moves it (a product name stays misspelled), but a short natural sentence
 # in the spoken language reliably does ("Acme Cloud", "Jira", "pull request").
 _VOCAB_SENTENCE = {"es": ("Hablamos de {}.", " y "), "en": ("We talked about {}.", " and ")}
 MAX_VOCAB = 30

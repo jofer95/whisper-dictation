@@ -18,5 +18,5 @@ dist/
 
 # Notes:
 # - Model weights are cached in ~/.cache/huggingface (outside the repo).
-# - User prefs live in ~/Library/Application Support/whisper-dictation-hcp/.
+# - User prefs live in ~/Library/Application Support/whisper-dictation/.
 # - The signing keychain/cert is created locally by scripts/sign_selfsigned.sh.

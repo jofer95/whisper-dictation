@@ -1,6 +1,6 @@
 """Local, on-disk state — everything stays on this Mac.
 
-  ~/Library/Application Support/whisper-dictation-hcp/
+  ~/Library/Application Support/whisper-dictation/
       dictionary.json   your words, corrections and snippets (hand-editable)
       history.jsonl     recent dictations (optional; "Save history" in the menu)
       stats.json        word counts / speaking time for the menu's stats line
@@ -30,8 +30,8 @@ _TEMPLATE = {
         "'corrections': what Whisper hears -> what you want. "
         "'snippets': say the trigger, get the text."
     ),
-    "words": ["Acme Cloud", "Wispr Flow", "GitHub", "Jira", "Slack"],
-    "corrections": {"acme cloud": "Acme Cloud", "wisper flow": "Wispr Flow"},
+    "words": ["GitHub", "README", "Jira", "Slack", "Wispr Flow"],
+    "corrections": {"git hub": "GitHub", "wisper flow": "Wispr Flow"},
     "snippets": {"my signature": "Thanks,\nYour Name"},
 }
 

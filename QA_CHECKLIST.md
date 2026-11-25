@@ -1,7 +1,7 @@
 # QA Checklist — Whisper Dictation
 
 Run through this before tagging a release. Check the menu-bar **Status** line and
-`~/Library/Logs/whisper-dictation-hcp.log` when something looks off.
+`~/Library/Logs/whisper-dictation.log` when something looks off.
 
 Legend: ⌘⌥ = default toggle. "Status" = the menu's `Status:` line.
 
@@ -51,7 +51,7 @@ Legend: ⌘⌥ = default toggle. "Status" = the menu's `Status:` line.
 ## 7. Preferences persistence
 - [ ] Change mic, shortcut, language, and mute via the menu.
 - [ ] Quit and relaunch → all four choices are remembered (check `prefs applied: …` in the log).
-- [ ] Preferences file exists at `~/Library/Application Support/whisper-dictation-hcp/prefs.json`.
+- [ ] Preferences file exists at `~/Library/Application Support/whisper-dictation/prefs.json`.
 - [ ] A saved mic that's currently unplugged falls back to system default without error.
 
 ## 8. Edge cases
